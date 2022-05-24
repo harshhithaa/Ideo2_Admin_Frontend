@@ -3,10 +3,7 @@ import { useState } from 'react';
 import ImageList from '@mui/material/ImageList';
 import ImageListItem from '@mui/material/ImageListItem';
 import ImageListItemBar from '@mui/material/ImageListItemBar';
-import {
-  Card,
-  Checkbox
-} from '@material-ui/core';
+import { Card, Checkbox } from '@material-ui/core';
 import CardMedia from '@mui/material/CardMedia';
 const MediaGrid = (props) => {
   const { media } = props || {};
@@ -38,10 +35,9 @@ const MediaGrid = (props) => {
       );
     }
     props.setselected(newSelectedMediaRefs);
-    
-    setSelectedMediaRef(newSelectedMediaRefs);
-    console.log('newSelectedMediaRefs',newSelectedMediaRefs);
 
+    setSelectedMediaRef(newSelectedMediaRefs);
+    console.log('newSelectedMediaRefs', newSelectedMediaRefs);
   };
 
   return (
@@ -52,41 +48,46 @@ const MediaGrid = (props) => {
         height: '100%'
       }}
     >
-      <ImageList sx={{ width: '100%', height: 450 }} variant="quilted" cols={6} gap={8}>
-        {media && media.map((item) => (
-          <ImageListItem style={{
-            padding: 5,
-            marginBottom:5
-          }} key={item.MediaRef}>
+      <ImageList
+        sx={{ width: '100%', height: 450 }}
+        variant="quilted"
+        cols={5}
+        gap={8}
+      >
+        {media &&
+          media.map((item) => (
+            <ImageListItem
+              style={{
+                padding: 5,
+                marginBottom: 5
+              }}
+              key={item.MediaRef}
+            >
+              <Checkbox
+                style={{
+                  padding: 5,
+                  marginBottom: 2
+                }}
+                checked={selectedMediaRef.indexOf(item.MediaRef) !== -1}
+                onChange={(event) => handleSelectOne(event, item.MediaRef)}
+                value="true"
+              />
+              <CardMedia
+                sx={{
+                  height: 200,
+                  display: 'block',
+                  maxWidth: 400,
+                  overflow: 'hidden',
+                  width: '100%'
+                }}
+                component={item.MediaType === 'image' ? 'img' : item.MediaType}
+                height="400"
+                src={item.MediaPath}
+                alt={item.label}
+                controls
+              />
 
-        <Checkbox
-        
-        style={{
-          padding: 5,
-          marginBottom:2
-        }}
-          checked={
-            selectedMediaRef.indexOf(item.MediaRef) !== -1
-          }
-          onChange={(event) => handleSelectOne(event, item.MediaRef)}
-          value="true"
-        />  
-        <CardMedia
-          sx={{
-            height: 200,
-            display: 'block',
-            maxWidth: 400,
-            overflow: 'hidden',
-            width: '100%',
-          }}
-            component={item.MediaType==="image"?"img":item.MediaType}
-            height="400"
-            src={item.MediaPath}
-            alt={item.label}
-            controls
-          />
-
-{/*         
+              {/*         
                         <CardMedia
                           sx={{
                             height: 200,
@@ -101,7 +102,7 @@ const MediaGrid = (props) => {
                             alt={item.label}
                             controls
                           /> */}
-        {/* if (item.MediaType==="video") {
+              {/* if (item.MediaType==="video") {
           <video width="250" controls>
             <source src={item.MediaPath}/>
           </video>
@@ -118,13 +119,10 @@ const MediaGrid = (props) => {
         
           
         } */}
-            
-            <ImageListItemBar
-              title={item.MediaName}
-            />
-        
-          </ImageListItem>
-        ))}
+
+              <ImageListItemBar title={item.MediaName} />
+            </ImageListItem>
+          ))}
       </ImageList>
     </Card>
   );
@@ -135,5 +133,3 @@ MediaGrid.propTypes = {
 };
 
 export default MediaGrid;
-
-

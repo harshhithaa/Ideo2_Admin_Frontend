@@ -9,8 +9,11 @@ import { useDropzone } from 'react-dropzone';
 import { Button, Box, CircularProgress } from '@material-ui/core';
 import { connect } from 'react-redux';
 import { saveMedia } from '../store/action/user';
-import {Alert, Stack} from '@mui/material';
-
+import { Alert, Stack } from '@mui/material';
+import 'tui-image-editor/dist/tui-image-editor.css';
+import ImageEditor from '@toast-ui/react-image-editor';
+import theme from '../components/customizedMedia/CustomizedMedia';
+import FilerobotImageEditor from 'react-filerobot-image-editor';
 
 const baseStyle = {
   flex: 1,
@@ -77,9 +80,10 @@ function StyledDropzone(props) {
   const [files, setFiles] = useState([]);
   const [disable, setDisable] = useState(false);
   let [box, setbox] = useState(false);
-  let [boxMessage, setboxMessage] = useState("");
-  let [color, setcolor] = useState("success");
+  let [boxMessage, setboxMessage] = useState('');
+  let [color, setcolor] = useState('success');
   const [disableButton, setDisableButton] = useState(true);
+  const [openEditor, setopenEditor] = useState(false);
   // const [inactive, setinactive] = useState(false);
 
   const {
@@ -91,10 +95,13 @@ function StyledDropzone(props) {
   } = useDropzone({
     accept: 'image/*, video/*',
     onDrop: (acceptedFiles) => {
+      console.log('heelo', acceptedFiles[0]);
       setFiles(
-        acceptedFiles.map((file) => Object.assign(file, {
-          preview: URL.createObjectURL(file)
-        }))
+        acceptedFiles.map((file) =>
+          Object.assign(file, {
+            preview: URL.createObjectURL(file)
+          })
+        )
       );
     }
   });
@@ -136,15 +143,12 @@ function StyledDropzone(props) {
 
     setDisable(true);
     props.saveMedia(formdata, (err) => {
-
-      console.log('err',err);
+      console.log('err', err);
       if (err.exists) {
-
-        
         setcolor('error');
         setboxMessage(err.err);
         setbox(true);
-        setdisable(false);
+        setDisable(false);
       } else {
         setDisable(false);
         setFiles([]);
@@ -159,13 +163,55 @@ function StyledDropzone(props) {
 
   return (
     <div className="container">
+      {openEditor && (
+        <ImageEditor
+          includeUI={{
+            loadImage: {
+              path: files[0].preview,
+              name: files[0].name
+            },
+            theme: theme,
+            menu: ['shape', 'filter', 'text'],
+            initMenu: 'filter',
+            uiSize: {
+              width: '1000px',
+              height: '700px'
+            },
+            menuBarPosition: 'bottom'
+          }}
+          usageStatistics={false}
+          cssMaxHeight={500}
+          cssMaxWidth={700}
+          selectionStyle={{
+            cornerSize: 20,
+            rotatingPointOffset: 70
+          }}
+        />
+      )}
+      {/* {openEditor && (
+        <FilerobotImageEditor
+          source={files[0].preview}
+          onSave={(editedImageObject, designState) => {
+            console.log('saved', editedImageObject, files[0]);
+            // setFiles(
+            //   Object.assign(editedImageObject, {
+            //     preview: URL.createObjectURL(editedImageObject)
+            //   })
+            // );
+          }}
+          onClose={() => setopenEditor(false)}
+          defaultSavedImageName={files[0].name}
+          defaultSavedImageType={files[0].type.split('/')[1]}
+        />
+      )} */}
       <Helmet>
         <title>Add Media | Ideogram</title>
       </Helmet>
-      { box?        
-       ( <Stack sx={{ width: '100%' }} spacing={2}>
-      <Alert severity={color}>{boxMessage}</Alert>
-    </Stack>):null}
+      {box ? (
+        <Stack sx={{ width: '100%' }} spacing={2}>
+          <Alert severity={color}>{boxMessage}</Alert>
+        </Stack>
+      ) : null}
       <div {...getRootProps({ style })}>
         <input {...getInputProps()} />
         <p>Drag and Drop your media here, or click to select</p>
@@ -174,14 +220,8 @@ function StyledDropzone(props) {
         </section>
       </div>
 
-
-      <Box sx={{ py: 1, ml:80}}>
-
-      {disable && <CircularProgress />}
-        
-      </Box>
-      <Box sx={{ py: 1, ml:70}}>
-
+      <Box sx={{ py: 1, ml: 80 }}>{disable && <CircularProgress />}</Box>
+      <Box sx={{ py: 1, ml: 70 }}>
         <Button
           color="primary"
           size="large"
@@ -191,14 +231,25 @@ function StyledDropzone(props) {
             saveMediaData();
           }}
         >
-          Add Media
+          Upload Media
+        </Button>
+        <Button
+          color="primary"
+          size="large"
+          variant="contained"
+          onClick={() => {
+            setopenEditor(true);
+          }}
+          sx={{ m: 1 }}
+        >
+          Edit Media
         </Button>
       </Box>
     </div>
   );
 }
 
-  <StyledDropzone />;
+<StyledDropzone />;
 
 const mapStateToProps = ({ root = {} }) => {
   const component = root.user.components;

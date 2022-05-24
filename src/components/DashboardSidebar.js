@@ -2,12 +2,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import PropTypes from 'prop-types';
-import {
-  Box,
-  Drawer,
-  Hidden,
-  List,
-} from '@material-ui/core';
+import { Box, Drawer, Hidden, List } from '@material-ui/core';
 import {
   BarChart as BarChartIcon,
   Calendar as CalendarIcon,
@@ -62,7 +57,6 @@ const DashboardSidebar = ({ onMobileClose, openMobile }) => {
         height: '100%'
       }}
     >
-
       <Box sx={{ p: 2 }}>
         <List>
           {items.map((item) => (
@@ -75,7 +69,6 @@ const DashboardSidebar = ({ onMobileClose, openMobile }) => {
           ))}
         </List>
       </Box>
-
     </Box>
   );
 
@@ -96,7 +89,7 @@ const DashboardSidebar = ({ onMobileClose, openMobile }) => {
           {content}
         </Drawer>
       </Hidden>
-      <Hidden xlDown>
+      <Hidden lgDown>
         <Drawer
           anchor="left"
           open
@@ -122,8 +115,7 @@ DashboardSidebar.propTypes = {
 };
 
 DashboardSidebar.defaultProps = {
-  onMobileClose: () => {
-  },
+  onMobileClose: () => {},
   openMobile: false
 };
 

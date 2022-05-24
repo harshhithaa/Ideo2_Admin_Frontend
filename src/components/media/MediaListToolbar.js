@@ -8,6 +8,7 @@ import {
   SvgIcon
 } from '@material-ui/core';
 import { Search as SearchIcon, Trash2 as Trash2Icon } from 'react-feather';
+import CustomizedMedia from '../customizedMedia/CustomizedMedia';
 
 const MediaListToolbar = (props) => (
   <Box {...props}>
@@ -17,21 +18,21 @@ const MediaListToolbar = (props) => (
         justifyContent: 'flex-end'
       }}
     >
-
       <Button sx={{ mx: 1 }} onClick={() => props.onclick()}>
-         <SvgIcon
-         fontSize="small"
-         color="action"
-       >
-         <Trash2Icon />
-       </SvgIcon>
-       Delete
+        <SvgIcon fontSize="small" color="action">
+          <Trash2Icon />
+        </SvgIcon>
+        Delete
       </Button>
       <Button
+        sx={{ mx: 1 }}
         color="primary"
         variant="contained"
-        href="savemedia"
+        onClick={() => <CustomizedMedia />}
       >
+        Create Media
+      </Button>
+      <Button color="primary" variant="contained" href="savemedia">
         Add Media
       </Button>
     </Box>
@@ -44,10 +45,7 @@ const MediaListToolbar = (props) => (
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SvgIcon
-                      fontSize="small"
-                      color="action"
-                    >
+                    <SvgIcon fontSize="small" color="action">
                       <SearchIcon />
                     </SvgIcon>
                   </InputAdornment>

@@ -4,27 +4,23 @@ import { styled } from '@material-ui/core/styles';
 import DashboardNavbar from './DashboardNavbar';
 import DashboardSidebar from './DashboardSidebar';
 
-const DashboardLayoutRoot = styled('div')(
-  ({ theme }) => ({
-    backgroundColor: theme.palette.background.default,
-    display: 'flex',
-    height: '100%',
-    overflow: 'hidden',
-    width: '100%'
-  })
-);
+const DashboardLayoutRoot = styled('div')(({ theme }) => ({
+  backgroundColor: theme.palette.background.default,
+  display: 'flex',
+  height: '100%',
+  overflow: 'hidden',
+  width: '100%'
+}));
 
-const DashboardLayoutWrapper = styled('div')(
-  ({ theme }) => ({
-    display: 'flex',
-    flex: '1 1 auto',
-    overflow: 'hidden',
-    paddingTop: 64,
-    [theme.breakpoints.up('lg')]: {
-      paddingLeft: 256
-    }
-  })
-);
+const DashboardLayoutWrapper = styled('div')(({ theme }) => ({
+  display: 'flex',
+  flex: '1 1 auto',
+  overflow: 'hidden',
+  paddingTop: 64,
+  [theme.breakpoints.up('lg')]: {
+    paddingLeft: 256
+  }
+}));
 
 const DashboardLayoutContainer = styled('div')({
   display: 'flex',
