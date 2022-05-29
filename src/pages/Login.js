@@ -7,6 +7,7 @@ import { Formik } from 'formik';
 import {
   Box,
   Button,
+  CircularProgress,
   Container,
   TextField,
   Typography
@@ -30,13 +31,15 @@ const Login = (props) => {
   }, [loader]);
 
   const signup = (data) => {
+    setloader(true);
     console.log(data, 'signup');
     props.storeUser(data, (err) => {
       if (err.exits) {
+        setloader(false);
         console.log('err', err);
         seterror(err.errmessage);
       } else {
-        setloader(!loader);
+        setloader(false);
       }
     });
   };
@@ -51,7 +54,7 @@ const Login = (props) => {
       event.preventDefault();
       const data = {
         Email: email,
-        Password: password,
+        Password: password
       };
       signup(data);
       event.stopPropagation();
@@ -73,20 +76,11 @@ const Login = (props) => {
         }}
       >
         <Container maxWidth="sm">
-          <Formik
-            onSubmit={OnSubmit}
-          >
-            {({
-              handleBlur,
-              handleSubmit,
-              isSubmitting,
-            }) => (
+          <Formik onSubmit={OnSubmit}>
+            {({ handleBlur, handleSubmit, isSubmitting }) => (
               <form onSubmit={handleSubmit}>
                 <Box sx={{ mb: 3 }}>
-                  <Typography
-                    color="textPrimary"
-                    variant="h2"
-                  >
+                  <Typography color="textPrimary" variant="h2">
                     Ideogram
                   </Typography>
                   <Typography
@@ -98,12 +92,8 @@ const Login = (props) => {
                   </Typography>
                 </Box>
                 <Box>
-                  <Typography
-                    color="red"
-                    gutterBottom
-                    variant="body2"
-                  >
-                    { error }
+                  <Typography color="red" gutterBottom variant="body2">
+                    {error}
                   </Typography>
                 </Box>
                 <TextField
@@ -128,7 +118,15 @@ const Login = (props) => {
                   variant="outlined"
                   required
                 />
-                <Box sx={{ py: 2 }}>
+                <Box
+                  sx={{
+                    py: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexDirection: 'column'
+                  }}
+                >
+                  {loader && <CircularProgress style={{ marginBottom: 10 }} />}
                   <Button
                     color="primary"
                     disabled={isSubmitting}
@@ -154,11 +152,11 @@ const mapStateToProps = ({ root = {} }) => {
   const { user } = root;
 
   return {
-    user,
+    user
   };
 };
 const mapDispatchToProps = (dispatch) => ({
-  storeUser: (data, callback) => dispatch(storeUser(data, callback)),
+  storeUser: (data, callback) => dispatch(storeUser(data, callback))
 });
 
 export default connect(mapStateToProps, mapDispatchToProps)(Login);

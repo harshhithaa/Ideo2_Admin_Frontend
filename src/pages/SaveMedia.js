@@ -90,7 +90,6 @@ function StyledDropzone(props) {
   } = useDropzone({
     accept: 'image/*, video/*',
     onDrop: (acceptedFiles) => {
-      console.log('heelo', acceptedFiles[0]);
       setFiles(
         acceptedFiles.map((file) =>
           Object.assign(file, {
@@ -98,6 +97,7 @@ function StyledDropzone(props) {
           })
         )
       );
+      setDisableButton(false);
     }
   });
 
@@ -185,6 +185,7 @@ function StyledDropzone(props) {
           onClick={() => {
             saveMediaData();
           }}
+          disabled={disableButton}
         >
           Upload Media
         </Button>

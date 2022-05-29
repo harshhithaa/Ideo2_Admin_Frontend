@@ -1,20 +1,24 @@
 import ImageEditor from '@toast-ui/react-image-editor';
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 
-const EditImage = ()=>{
-const navigation = useNavigate();
- return (<ImageEditor
+const EditImage = () => {
+  const location = useLocation();
+
+  return (
+    <ImageEditor
       includeUI={{
         loadImage: {
-          path: 'sammple',
+          path: location.state,
           name: 'SampleImage'
         },
-        theme: {'menu.normalIcon.color': '#ffffff',
-        'menu.activeIcon.color': '#ffffff',
-        'menu.disabledIcon.color': '#ffffff',
-        'menu.hoverIcon.color': '#ffffff',
-        'submenu.normalIcon.color': '#ffffff',
-        'submenu.activeIcon.color': '#000000',},
+        theme: {
+          'menu.normalIcon.color': '#ffffff',
+          'menu.activeIcon.color': '#ffffff',
+          'menu.disabledIcon.color': '#ffffff',
+          'menu.hoverIcon.color': '#ffffff',
+          'submenu.normalIcon.color': '#ffffff',
+          'submenu.activeIcon.color': '#000000'
+        },
         menu: ['text'],
         initMenu: 'text',
         uiSize: {
@@ -31,7 +35,7 @@ const navigation = useNavigate();
       }}
       usageStatistics={true}
     />
- );
-}
+  );
+};
 
 export default EditImage;
