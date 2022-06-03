@@ -56,7 +56,7 @@ const Dashboard = () => (
             xl={3}
             xs={12}
           >
-            <Schedule sx={{ height: '100%' }} />
+            <Schedule />
           </Grid>
         </Grid>
       </Container>

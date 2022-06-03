@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import 'tui-image-editor/dist/tui-image-editor.css';
 import FileSaver from 'file-saver';
 import { Button, Card, Modal, Typography } from '@material-ui/core';
-import background1 from 'src/assets/backgrounds/background1.jpg';
-import background2 from 'src/assets/backgrounds/background2.jpg';
-import background3 from 'src/assets/backgrounds/background3.jpg';
-import background4 from 'src/assets/backgrounds/background4.jpg';
-import background5 from 'src/assets/backgrounds/background5.jpg';
+import background1 from 'src/assets/backgrounds/1.jpg';
+import background2 from 'src/assets/backgrounds/2.jpg';
+import background3 from 'src/assets/backgrounds/3.jpg';
+import background4 from 'src/assets/backgrounds/4.jpg';
+import background5 from 'src/assets/backgrounds/5.jpg';
 import { useNavigate } from 'react-router-dom';
 
 const CustomizedMedia = () => {

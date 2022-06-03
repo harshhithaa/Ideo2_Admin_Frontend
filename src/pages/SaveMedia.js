@@ -10,6 +10,7 @@ import { Button, Box, CircularProgress } from '@material-ui/core';
 import { connect } from 'react-redux';
 import { saveMedia } from '../store/action/user';
 import { Alert, Stack } from '@mui/material';
+import imageCompression from "browser-image-compression";
 
 const baseStyle = {
   flex: 1,
@@ -79,14 +80,22 @@ function StyledDropzone(props) {
   let [boxMessage, setboxMessage] = useState('');
   let [color, setcolor] = useState('success');
   const [disableButton, setDisableButton] = useState(true);
+  const [compressedFile, setCompressedFile] = useState(null);
   // const [inactive, setinactive] = useState(false);
+
+  const options = {
+    maxSizeMB: 1,
+    maxWidthOrHeight: 1920,
+    useWebWorker: true,
+    fileType: 'image/jpeg'
+  }
 
   const {
     getRootProps,
     getInputProps,
     isDragActive,
     isDragAccept,
-    isDragReject
+    isDragReject,
   } = useDropzone({
     accept: 'image/*, video/*',
     onDrop: (acceptedFiles) => {
@@ -97,7 +106,6 @@ function StyledDropzone(props) {
           })
         )
       );
-      setDisableButton(false);
     }
   });
 
@@ -119,6 +127,7 @@ function StyledDropzone(props) {
     </div>
   ));
   console.log(props);
+
   useEffect(
     () => () => {
       // Make sure to revoke the data uris to avoid memory leaks
@@ -127,6 +136,18 @@ function StyledDropzone(props) {
     [files]
   );
 
+  useEffect(()=>{
+    files.map((image)=>{
+      imageCompression(image,options).then((compressedFile)=>{
+        console.log("whatsup",compressedFile)
+        var file = new File([compressedFile], compressedFile.name,{type:'image/jpeg'});
+        console.log(file)
+        setCompressedFile(file);
+        setDisableButton(false);
+      })
+    })
+  },[files])
+
   function saveMediaData() {
     console.log('running saveMediaData');
 
@@ -134,7 +155,7 @@ function StyledDropzone(props) {
 
     files.forEach((i) => {
       console.log(i);
-      formdata.append('Media', i);
+      formdata.append('Media', compressedFile);
     });
 
     setDisable(true);
@@ -154,6 +175,7 @@ function StyledDropzone(props) {
         setboxMessage('Media Successfully added!');
         setbox(true);
       }
+      setDisableButton(true)
     });
   }
 

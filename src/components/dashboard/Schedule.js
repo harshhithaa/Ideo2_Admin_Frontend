@@ -9,11 +9,17 @@ import {
   Calendar as CalendarIcon,
 } from 'react-feather';
 import { indigo } from '@material-ui/core/colors';
+import { useNavigate } from 'react-router-dom';
 
-const Schedule = (props) => (
+const Schedule = (props) => {
+
+  const navigate = useNavigate();
+
+  return(
   <Card
-    sx={{ height: '100%' }}
+    sx={{ height: '100%', cursor: "pointer" }}
     {...props}
+    onClick={()=>{navigate('/app/schedules')}}
   >
     <CardContent>
       <Grid
@@ -44,6 +50,6 @@ const Schedule = (props) => (
       </Grid>
     </CardContent>
   </Card>
-);
+)};
 
 export default Schedule;

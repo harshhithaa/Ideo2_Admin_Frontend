@@ -1,15 +1,20 @@
 import ImageEditor from '@toast-ui/react-image-editor';
 import { useLocation } from 'react-router-dom';
+import short from 'short-uuid';
+
+const uuid = short.generate();
+
 
 const EditImage = () => {
   const location = useLocation();
+  
 
   return (
     <ImageEditor
       includeUI={{
         loadImage: {
           path: location.state,
-          name: 'SampleImage'
+          name: uuid
         },
         theme: {
           'menu.normalIcon.color': '#ffffff',
@@ -19,7 +24,7 @@ const EditImage = () => {
           'submenu.normalIcon.color': '#ffffff',
           'submenu.activeIcon.color': '#000000'
         },
-        menu: ['text'],
+        menu: ['text','draw','mask','rotate','crop','flip','shape','icon','filter'],
         initMenu: 'text',
         uiSize: {
           width: '100%',

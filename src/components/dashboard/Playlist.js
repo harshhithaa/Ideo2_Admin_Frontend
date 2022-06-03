@@ -9,11 +9,17 @@ import {
   PlayCircle as PlayCircleIcon,
 } from 'react-feather';
 import { orange } from '@material-ui/core/colors';
+import { useNavigate } from 'react-router-dom';
 
-const Monitor = (props) => (
+const Monitor = (props) => {
+
+  const navigate = useNavigate();
+
+  return(
   <Card
-    sx={{ height: '100%' }}
+    sx={{ height: '100%', cursor: "pointer" }}
     {...props}
+    onClick={()=>{navigate('/app/playlists')}}
   >
     <CardContent>
       <Grid
@@ -44,6 +50,6 @@ const Monitor = (props) => (
       </Grid>
     </CardContent>
   </Card>
-);
+)};
 
 export default Monitor;

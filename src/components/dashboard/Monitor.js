@@ -10,11 +10,18 @@ import {
   Monitor as MonitorIcon,
 } from 'react-feather';
 import { red } from '@material-ui/core/colors';
+import { useNavigate } from 'react-router-dom';
 
-const Monitor = (props) => (
+
+
+const Monitor = (props) => {
+
+  const navigate = useNavigate();
+  return(
   <Card
-    sx={{ height: '100%' }}
+    sx={{ height: '100%', cursor:"pointer" }}
     {...props}
+    onClick={()=>{navigate('/app/monitors')}}
   >
     <CardContent>
       <Grid
@@ -44,7 +51,7 @@ const Monitor = (props) => (
         </Grid>
       </Grid>
     </CardContent>
-  </Card>
-);
+  </Card>)
+};
 
 export default Monitor;
