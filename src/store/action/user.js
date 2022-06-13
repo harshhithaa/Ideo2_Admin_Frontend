@@ -153,34 +153,36 @@ export const savePlaylist = (data, callback) => (dispatch) => {
 export const saveSchedule = (data, callback) => (dispatch) => {
   const token = store.getState().root.user.accesstoken;
   console.log(data);
-  
+
   try {
     if (data.id) {
       //add edit code here
     } else {
-    Api.post('/admin/saveschedule', data, {
-      headers: {
-        'Content-Type': 'application/json',
-        AuthToken: token
-      }
-    })
-      .then((res) => {
-        if (!res.data.Error) {
-          dispatch({
-            type: SAVESCHEDULE,
-            payload: res.data.Details
-          });
-          callback({ exists: false });
-        } else {
-          if (res.data.Error.ErrorCode === ErrorCode.Invalid_User_Credentials) {
-            localStorage.clear();
-          }
-          callback({ exists: true, errmessage: res.data.Error.ErrorMessage });
+      Api.post('/admin/saveschedule', data, {
+        headers: {
+          'Content-Type': 'application/json',
+          AuthToken: token
         }
       })
-      .catch((err) => {
-        console.log(err);
-      });
+        .then((res) => {
+          if (!res.data.Error) {
+            dispatch({
+              type: SAVESCHEDULE,
+              payload: res.data.Details
+            });
+            callback({ exists: false });
+          } else {
+            if (
+              res.data.Error.ErrorCode === ErrorCode.Invalid_User_Credentials
+            ) {
+              localStorage.clear();
+            }
+            callback({ exists: true, errmessage: res.data.Error.ErrorMessage });
+          }
+        })
+        .catch((err) => {
+          console.log(err);
+        });
     }
   } catch (err) {
     console.log(err);
@@ -189,34 +191,36 @@ export const saveSchedule = (data, callback) => (dispatch) => {
 export const saveMonitor = (data, callback) => (dispatch) => {
   const token = store.getState().root.user.accesstoken;
   console.log(data);
-  
+
   try {
     if (data.id) {
       //add edit code here
     } else {
-    Api.post('/admin/savemonitor', data, {
-      headers: {
-        'Content-Type': 'application/json',
-        AuthToken: token
-      }
-    })
-      .then((res) => {
-        if (!res.data.Error) {
-          dispatch({
-            type: SAVEMONITOR,
-            payload: res.data.Details
-          });
-          callback({ exists: false });
-        } else {
-          if (res.data.Error.ErrorCode === ErrorCode.Invalid_User_Credentials) {
-            localStorage.clear();
-          }
-          callback({ exists: true, errmessage: res.data.Error.ErrorMessage });
+      Api.post('/admin/savemonitor', data, {
+        headers: {
+          'Content-Type': 'application/json',
+          AuthToken: token
         }
       })
-      .catch((err) => {
-        console.log(err);
-      });
+        .then((res) => {
+          if (!res.data.Error) {
+            dispatch({
+              type: SAVEMONITOR,
+              payload: res.data.Details
+            });
+            callback({ exists: false });
+          } else {
+            if (
+              res.data.Error.ErrorCode === ErrorCode.Invalid_User_Credentials
+            ) {
+              localStorage.clear();
+            }
+            callback({ exists: true, errmessage: res.data.Error.ErrorMessage });
+          }
+        })
+        .catch((err) => {
+          console.log(err);
+        });
     }
   } catch (err) {
     console.log(err);

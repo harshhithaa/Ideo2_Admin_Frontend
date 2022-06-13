@@ -10,7 +10,7 @@ import { Button, Box, CircularProgress } from '@material-ui/core';
 import { connect } from 'react-redux';
 import { saveMedia } from '../store/action/user';
 import { Alert, Stack } from '@mui/material';
-import imageCompression from "browser-image-compression";
+import imageCompression from 'browser-image-compression';
 
 const baseStyle = {
   flex: 1,
@@ -88,14 +88,14 @@ function StyledDropzone(props) {
     maxWidthOrHeight: 1920,
     useWebWorker: true,
     fileType: 'image/jpeg'
-  }
+  };
 
   const {
     getRootProps,
     getInputProps,
     isDragActive,
     isDragAccept,
-    isDragReject,
+    isDragReject
   } = useDropzone({
     accept: 'image/*, video/*',
     onDrop: (acceptedFiles) => {
@@ -136,17 +136,21 @@ function StyledDropzone(props) {
     [files]
   );
 
-  useEffect(()=>{
-    files.map((image)=>{
-      imageCompression(image,options).then((compressedFile)=>{
-        console.log("whatsup",compressedFile)
-        var file = new File([compressedFile], compressedFile.name,{type:'image/jpeg'});
-        console.log(file)
-        setCompressedFile(file);
+  useEffect(() => {
+    files.map((file) => {
+      if (file.type.split('/')[0] === 'image') {
+        imageCompression(file, options).then((compressedFile) => {
+          var newFile = new File([compressedFile], compressedFile.name, {
+            type: 'image/jpeg'
+          });
+          setCompressedFile(newFile);
+          setDisableButton(false);
+        });
+      } else if (file.type.split('/')[0] === 'video') {
         setDisableButton(false);
-      })
-    })
-  },[files])
+      }
+    });
+  }, [files]);
 
   function saveMediaData() {
     console.log('running saveMediaData');
@@ -155,7 +159,11 @@ function StyledDropzone(props) {
 
     files.forEach((i) => {
       console.log(i);
-      formdata.append('Media', compressedFile);
+      if (i.type.split('/')[0] === 'image') {
+        formdata.append('Media', compressedFile);
+      } else if (i.type.split('/')[0] === 'video') {
+        formdata.append('Media', i);
+      }
     });
 
     setDisable(true);
@@ -175,7 +183,7 @@ function StyledDropzone(props) {
         setboxMessage('Media Successfully added!');
         setbox(true);
       }
-      setDisableButton(true)
+      setDisableButton(true);
     });
   }
 

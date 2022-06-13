@@ -7,7 +7,7 @@
 /* eslint-disable array-callback-return */
 /* eslint-disable react/prop-types */
 import React, { useState, useEffect } from 'react';
-import { useNavigate ,useLocation} from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import * as Yup from 'yup';
 import { Formik } from 'formik';
@@ -29,38 +29,54 @@ import {
 } from '@material-ui/core';
 import { COMPONENTS } from 'src/utils/constant';
 import { getUserComponentList, saveMonitor } from '../store/action/user';
-import {Alert, Stack} from '@mui/material';
+import { Alert, Stack } from '@mui/material';
 
 const SaveMonitorDetails = (props) => {
   const { component } = props || null;
   const navigate = useNavigate();
   const { state } = useLocation();
- console.log("state", state )
+  console.log('state', state);
 
-
- const [MonitorRef, setMonitorRef] = useState((state && state.MonitorRef) || '');
+  const [MonitorRef, setMonitorRef] = useState(
+    (state && state.MonitorRef) || ''
+  );
   const [playlist, setPlaylist] = useState([]);
   const [schedule, setSchedule] = useState([]);
-  const [title, setTitle] = useState((state && state.MonitorName) ||'');
-  const [description, setDescription] = useState((state && state.Description) ||'');
+  const [title, setTitle] = useState((state && state.MonitorName) || '');
+  const [description, setDescription] = useState(
+    (state && state.Description) || ''
+  );
   const [playlistData, setPlaylistData] = useState([]);
   const [scheduleData, setScheduleData] = useState([]);
-  const [selectedPlaylist, setSelectedPlaylist] = useState((state && state.PlaylistRef)||'');
-  const [selectedSchedule, setSelectedSchedule] = useState((state && state.ScheduleRef)||'');
+  const [selectedPlaylist, setSelectedPlaylist] = useState(
+    (state && state.PlaylistRef) || ''
+  );
+  const [selectedSchedule, setSelectedSchedule] = useState(
+    (state && state.ScheduleRef) || ''
+  );
   const [loader, setloader] = useState(true);
   const [scheduleloader, setScheduleloader] = useState(true);
-  const [selectedOrientation, setSelectedOrientation] = useState((state && state.Orientation) || '');
+  const [selectedOrientation, setSelectedOrientation] = useState(
+    (state && state.Orientation) || ''
+  );
   const [slideTime, setSlideTime] = useState((state && state.SlideTime) || '');
-  const [type, settype] = useState((state && state.type==="View"?'View':state && state.type==="Edit"?'Update':'Create') );
+  const [type, settype] = useState(
+    state && state.type === 'View'
+      ? 'View'
+      : state && state.type === 'Edit'
+      ? 'Update'
+      : 'Create'
+  );
   let [box, setbox] = useState(false);
-  let [boxMessage, setboxMessage] = useState("");
-  let [color, setcolor] = useState("success");
+  let [boxMessage, setboxMessage] = useState('');
+  let [color, setcolor] = useState('success');
   const [checked, setChecked] = useState(false);
-   // const [disable, setDisable] = useState([]);
-  let days = (state &&state.Days&& state.Days.split(","))||[];
-  const orientations = ['0','90','180','270']
+  // const [disable, setDisable] = useState([]);
+  let days = (state && state.Days && state.Days.split(',')) || [];
+  const orientations = ['0', '90', '180', '270'];
   const min = 5;
   const max = 60;
+  const step = 5;
 
   useEffect(() => {
     const data = {
@@ -81,9 +97,7 @@ const SaveMonitorDetails = (props) => {
         setPlaylist(component.playlistList);
         setloader(false);
         console.log('playlist', playlist);
-        
       }
-
     });
     setPlaylistData(playlist);
 
@@ -99,12 +113,9 @@ const SaveMonitorDetails = (props) => {
         console.log('schedule', schedule);
       }
     });
-  
-    setScheduleData(schedule);
 
-   
-   
-  }, [loader,scheduleloader]);
+    setScheduleData(schedule);
+  }, [loader, scheduleloader]);
 
   function saveMonitorData() {
     const saveMonitorDetails = {
@@ -116,11 +127,10 @@ const SaveMonitorDetails = (props) => {
       Orientation: selectedOrientation,
       SlideTime: slideTime
     };
-    if(MonitorRef!=='')
-    saveMonitorDetails.MonitorRef = MonitorRef;
+    if (MonitorRef !== '') saveMonitorDetails.MonitorRef = MonitorRef;
 
-    console.log("saveMonitorDetails Request", saveMonitorDetails);
-   
+    console.log('saveMonitorDetails Request', saveMonitorDetails);
+
     // setDisable(true);
     props.saveMonitor(saveMonitorDetails, (err) => {
       if (err.exists) {
@@ -161,18 +171,15 @@ const SaveMonitorDetails = (props) => {
               fixedTimePlayback: false,
               days: []
             }}
-            
             onSubmit={() => {
               navigate('/app/monitors', { replace: true });
             }}
           >
-            {({
-              errors, handleBlur, handleSubmit, isSubmitting, touched
-            }) => (
+            {({ errors, handleBlur, handleSubmit, isSubmitting, touched }) => (
               <form onSubmit={handleSubmit}>
                 <Box sx={{ mb: 3 }}>
                   <Typography color="textPrimary" variant="h2">
-                    {type}  Monitor
+                    {type} Monitor
                   </Typography>
                 </Box>
                 <TextField
@@ -215,16 +222,13 @@ const SaveMonitorDetails = (props) => {
                   }}
                 >
                   {playlistData && playlistData.length > 0 ? (
-                    
                     playlistData.map((item) => (
-                      <MenuItem
-                        value={item.PlaylistRef}
-                      >
+                      <MenuItem value={item.PlaylistRef}>
                         {`${item.Name}`}
                       </MenuItem>
                     ))
                   ) : (
-                    <MenuItem>{"No Items available"}</MenuItem>
+                    <MenuItem>{'No Items available'}</MenuItem>
                   )}
                 </Select>
                 <InputLabel id="select-schedule">Schedule</InputLabel>
@@ -238,11 +242,9 @@ const SaveMonitorDetails = (props) => {
                     setSelectedSchedule(e.target.value);
                   }}
                 >
-                  { scheduleData && scheduleData.length > 0 ? (
+                  {scheduleData && scheduleData.length > 0 ? (
                     scheduleData.map((item) => (
-                      <MenuItem
-                        value={item.ScheduleRef}
-                      >
+                      <MenuItem value={item.ScheduleRef}>
                         {`${item.Title}`}
                       </MenuItem>
                     ))
@@ -250,34 +252,41 @@ const SaveMonitorDetails = (props) => {
                     <MenuItem>No Items available</MenuItem>
                   )}
                 </Select>
-                <InputLabel id="select-orientation">Select Orientation</InputLabel>
-                <Select 
-                labelId="select-orientation" 
-                id="select-orientation"
-                value={selectedOrientation}
-                label="orientation"
-                onChange={(e)=>{
-                  console.log('e.target.value', e.target.value);
-                  setSelectedOrientation(e.target.value);
-                }}
+                <InputLabel id="select-orientation">
+                  Select Orientation
+                </InputLabel>
+                <Select
+                  labelId="select-orientation"
+                  id="select-orientation"
+                  value={selectedOrientation}
+                  label="orientation"
+                  onChange={(e) => {
+                    console.log('e.target.value', e.target.value);
+                    setSelectedOrientation(e.target.value);
+                  }}
                 >
-                {orientations.map(value=>(
-                  <MenuItem value={value}>{value}</MenuItem>
-                ))}
+                  {orientations.map((value) => (
+                    <MenuItem value={value}>{value}</MenuItem>
+                  ))}
                 </Select>
-                <InputLabel id="select-slide-interval">Select Slide Interval</InputLabel>
+                <InputLabel id="select-slide-interval">
+                  Select Slide Interval (in seconds)
+                </InputLabel>
                 <TextField
-                type="number" 
-                id="select-slide-interval" 
-                value={slideTime}
-                inputProps={{min,max}} 
-                onChange={(e)=>{setSlideTime(e.target.value)}}
+                  type="number"
+                  id="select-slide-interval"
+                  value={slideTime}
+                  inputProps={{ min, max, step }}
+                  onChange={(e) => {
+                    setSlideTime(e.target.value);
+                  }}
                 />
-                { box?        
-       ( <Stack sx={{ width: '100%' }} spacing={2}>
-      <Alert severity={color}>{boxMessage}</Alert>
-    </Stack>):null}
-                
+                {box ? (
+                  <Stack sx={{ width: '100%' }} spacing={2}>
+                    <Alert severity={color}>{boxMessage}</Alert>
+                  </Stack>
+                ) : null}
+
                 <Box sx={{ py: 2 }}>
                   <Button
                     color="primary"
@@ -288,6 +297,7 @@ const SaveMonitorDetails = (props) => {
                     onClick={() => {
                       saveMonitorData();
                     }}
+                    disabled={slideTime < 5 || slideTime > 60}
                   >
                     {type} Monitor
                   </Button>
@@ -309,10 +319,8 @@ const mapStateToProps = ({ root = {} }) => {
   };
 };
 const mapDispatchToProps = (dispatch) => ({
-  getUserComponentList: (data, callback) => dispatch(getUserComponentList(data, callback)),
+  getUserComponentList: (data, callback) =>
+    dispatch(getUserComponentList(data, callback)),
   saveMonitor: (data, callback) => dispatch(saveMonitor(data, callback))
 });
-export default connect(
-  mapStateToProps,
-  mapDispatchToProps
-)(SaveMonitorDetails);
+export default connect(mapStateToProps, mapDispatchToProps)(SaveMonitorDetails);

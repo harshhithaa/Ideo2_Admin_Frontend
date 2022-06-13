@@ -15,7 +15,11 @@ import { connect } from 'react-redux';
 import { COMPONENTS } from 'src/utils/constant';
 import MediaListToolbar from '../components/media/MediaListToolbar';
 import MediaGrid from '../components/media/MediaGrid';
-import { getUserComponentList, deleteComponentList } from '../store/action/user';
+import {
+  getUserComponentList,
+  deleteComponentList
+} from '../store/action/user';
+import { useNavigate } from 'react-router-dom';
 
 const MediaList = (props) => {
   const { media } = props || {};
@@ -23,6 +27,9 @@ const MediaList = (props) => {
   const [loader, setLoader] = useState(false);
   const [selected, setselected] = useState([]);
   const [showmodal, setModal] = useState(false);
+
+  const navigate = useNavigate();
+
   useEffect(() => {
     const data = {
       componenttype: COMPONENTS.Media
@@ -78,7 +85,7 @@ const MediaList = (props) => {
         }}
       >
         <Container maxWidth={false}>
-        <Modal
+          <Modal
             open={showmodal}
             onClose={() => setModal(false)}
             aria-labelledby="modal-modal-title"
@@ -113,7 +120,6 @@ const MediaList = (props) => {
           <MediaListToolbar onclick={() => setModal(true)} />
 
           <MediaGrid media={mediaItem} setselected={setselected} />
-          
         </Container>
       </Box>
     </>
@@ -123,13 +129,14 @@ const MediaList = (props) => {
 const mapStateToProps = ({ root = {} }) => {
   const media = root.user.components;
   return {
-    media,
+    media
   };
 };
 const mapDispatchToProps = (dispatch) => ({
-  getUserComponentList: (data, callback) => dispatch(getUserComponentList(data, callback)),
+  getUserComponentList: (data, callback) =>
+    dispatch(getUserComponentList(data, callback)),
   deleteComponentList: (data, callback) =>
-  dispatch(deleteComponentList(data, callback))
+    dispatch(deleteComponentList(data, callback))
 });
 
 export default connect(mapStateToProps, mapDispatchToProps)(MediaList);
