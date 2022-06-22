@@ -56,8 +56,8 @@ const SaveMonitorDetails = (props) => {
   );
   const [loader, setloader] = useState(true);
   const [scheduleloader, setScheduleloader] = useState(true);
-  const [selectedOrientation, setSelectedOrientation] = useState(
-    (state && state.Orientation) || ''
+  const [orientation, setOrientation] = useState(
+    (state && state.Orientation === '90' ? 'Landscape' : 'Portrait') || ''
   );
   const [slideTime, setSlideTime] = useState((state && state.SlideTime) || '');
   const [type, settype] = useState(
@@ -73,7 +73,7 @@ const SaveMonitorDetails = (props) => {
   const [checked, setChecked] = useState(false);
   // const [disable, setDisable] = useState([]);
   let days = (state && state.Days && state.Days.split(',')) || [];
-  const orientations = ['0', '90', '180', '270'];
+  const orientations = ['Portrait', 'Landscape'];
   const min = 5;
   const max = 60;
   const step = 5;
@@ -124,7 +124,7 @@ const SaveMonitorDetails = (props) => {
       DefaultPlaylistRef: selectedPlaylist,
       ScheduleRef: selectedSchedule,
       IsActive: 1,
-      Orientation: selectedOrientation,
+      Orientation: orientation === 'Landscape' ? '90' : '0',
       SlideTime: slideTime
     };
     if (MonitorRef !== '') saveMonitorDetails.MonitorRef = MonitorRef;
@@ -258,11 +258,11 @@ const SaveMonitorDetails = (props) => {
                 <Select
                   labelId="select-orientation"
                   id="select-orientation"
-                  value={selectedOrientation}
+                  value={orientation}
                   label="orientation"
                   onChange={(e) => {
                     console.log('e.target.value', e.target.value);
-                    setSelectedOrientation(e.target.value);
+                    setOrientation(e.target.value);
                   }}
                 >
                   {orientations.map((value) => (

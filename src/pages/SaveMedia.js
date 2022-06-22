@@ -84,7 +84,7 @@ function StyledDropzone(props) {
   // const [inactive, setinactive] = useState(false);
 
   const options = {
-    maxSizeMB: 1,
+    maxSizeMB: 0.5,
     maxWidthOrHeight: 1920,
     useWebWorker: true,
     fileType: 'image/jpeg'
@@ -170,6 +170,7 @@ function StyledDropzone(props) {
     props.saveMedia(formdata, (err) => {
       console.log('err', err);
       if (err.exists) {
+        setFiles([]);
         setcolor('error');
         setboxMessage(err.err);
         setbox(true);
