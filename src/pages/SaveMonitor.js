@@ -30,6 +30,7 @@ import {
 import { COMPONENTS } from 'src/utils/constant';
 import { getUserComponentList, saveMonitor } from '../store/action/user';
 import { Alert, Stack } from '@mui/material';
+import { X as CloseIcon } from 'react-feather';
 
 const SaveMonitorDetails = (props) => {
   const { component } = props || null;
@@ -231,27 +232,38 @@ const SaveMonitorDetails = (props) => {
                     <MenuItem>{'No Items available'}</MenuItem>
                   )}
                 </Select>
-                <InputLabel id="select-schedule">Schedule</InputLabel>
-                <Select
-                  labelId="select-schedule"
-                  id="select-schedule"
-                  value={selectedSchedule}
-                  label="schedule"
-                  onChange={(e) => {
-                    console.log('e.target.value', e.target.value);
-                    setSelectedSchedule(e.target.value);
-                  }}
-                >
-                  {scheduleData && scheduleData.length > 0 ? (
-                    scheduleData.map((item) => (
-                      <MenuItem value={item.ScheduleRef}>
-                        {`${item.Title}`}
-                      </MenuItem>
-                    ))
-                  ) : (
-                    <MenuItem>No Items available</MenuItem>
-                  )}
-                </Select>
+                <Box>
+                  <InputLabel id="select-schedule">Schedule</InputLabel>
+                  <Select
+                    labelId="select-schedule"
+                    id="select-schedule"
+                    value={selectedSchedule}
+                    label="schedule"
+                    onChange={(e) => {
+                      console.log('e.target.value', e.target.value);
+                      setSelectedSchedule(e.target.value);
+                    }}
+                  >
+                    {scheduleData && scheduleData.length > 0 ? (
+                      scheduleData.map((item) => (
+                        <MenuItem value={item.ScheduleRef}>
+                          {`${item.Title}`}
+                        </MenuItem>
+                      ))
+                    ) : (
+                      <MenuItem>No Items available</MenuItem>
+                    )}
+                  </Select>
+                  <Button
+                    startIcon={<CloseIcon size={17} />}
+                    style={{ marginLeft: 10 }}
+                    onClick={() => {
+                      setSelectedSchedule(0);
+                    }}
+                  >
+                    Clear
+                  </Button>
+                </Box>
                 <InputLabel id="select-orientation">
                   Select Orientation
                 </InputLabel>

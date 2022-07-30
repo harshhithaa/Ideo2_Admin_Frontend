@@ -20,8 +20,8 @@ import {
 import PropTypes from 'prop-types';
 
 const MonitorListResults = (props) => {
-  const { monitors,search } = props || {};
-  console.log('search',search);
+  const { monitors, search } = props || {};
+  console.log('search', search);
   const [selectedMonitorRefs, setSelectedMonitorRefs] = useState([]);
   const [limit, setLimit] = useState(10);
   const [page, setPage] = useState(0);
@@ -29,7 +29,7 @@ const MonitorListResults = (props) => {
 
   const handleSelectAll = (event) => {
     let newSelectedMonitorRefs;
-    setall(event.target.checked)
+    setall(event.target.checked);
 
     if (event.target.checked) {
       newSelectedMonitorRefs = monitors.map((monitor) => monitor.MonitorRef);
@@ -86,13 +86,11 @@ const MonitorListResults = (props) => {
               <TableRow>
                 <TableCell padding="checkbox">
                   <Checkbox
-                     checked={
-                      allchecked
-                      }
+                    checked={allchecked}
                     color="primary"
                     indeterminate={
-                      selectedMonitorRefs.length > 0
-                      && selectedMonitorRefs.length < monitors.length
+                      selectedMonitorRefs.length > 0 &&
+                      selectedMonitorRefs.length < monitors.length
                     }
                     onChange={handleSelectAll}
                   />
@@ -105,61 +103,77 @@ const MonitorListResults = (props) => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {monitors &&               
-              monitors.length>0 && 
-              monitors
-              .filter(item=>item.MonitorName.toLowerCase().includes(search.toLowerCase()))
-              .slice(0, limit).map((monitor) => (
-                <TableRow
-                  hover
-                  key={monitor.MonitorRef}
-                  selected={
-                    selectedMonitorRefs.indexOf(monitor.MonitorRef) !== -1
-                  }
-                >
-                  <TableCell padding="checkbox">
-                    <Checkbox
-                      checked={
+              {monitors &&
+                monitors.length > 0 &&
+                monitors
+                  .filter((item) =>
+                    item.MonitorName.toLowerCase().includes(
+                      search.toLowerCase()
+                    )
+                  )
+                  .slice(0, limit)
+                  .map((monitor) => (
+                    <TableRow
+                      hover
+                      key={monitor.MonitorRef}
+                      selected={
                         selectedMonitorRefs.indexOf(monitor.MonitorRef) !== -1
                       }
-                      onChange={(event) => handleSelectOne(event, monitor.MonitorRef)}
-                      value="true"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Box
-                      sx={{
-                        alignItems: 'center',
-                        display: 'flex'
-                      }}
                     >
-                      <Typography color="textPrimary" variant="body1">
-                        {monitor.MonitorName}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>{monitor.Description==='null'?'--':monitor.Description}</TableCell>
-                  <TableCell>{`${monitor.ScheduleName}`=='null'?'--':`${monitor.ScheduleName}`}</TableCell>
-                  <TableCell>{monitor.DefaultPlaylistName}</TableCell>
-                  <TableCell>
-                      <Button
-                        sx={{ mx: 1 }}
-                        onClick={() => props.editcall(monitor)}
-                      >
-                        <SvgIcon fontSize="small" color="action">
-                          <EditIcon />
-                        </SvgIcon>
-                      </Button>
-                    </TableCell>
-                </TableRow>
-              ))}
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          checked={
+                            selectedMonitorRefs.indexOf(monitor.MonitorRef) !==
+                            -1
+                          }
+                          onChange={(event) =>
+                            handleSelectOne(event, monitor.MonitorRef)
+                          }
+                          value="true"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Box
+                          sx={{
+                            alignItems: 'center',
+                            display: 'flex'
+                          }}
+                        >
+                          <Typography color="textPrimary" variant="body1">
+                            {monitor.MonitorName}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        {monitor.Description === 'null'
+                          ? '--'
+                          : monitor.Description}
+                      </TableCell>
+                      <TableCell>
+                        {`${monitor.ScheduleName}` == 'null'
+                          ? '--'
+                          : `${monitor.ScheduleName}`}
+                      </TableCell>
+                      <TableCell>{monitor.DefaultPlaylistName}</TableCell>
+                      <TableCell>
+                        <Button
+                          sx={{ mx: 1 }}
+                          onClick={() => props.editcall(monitor)}
+                        >
+                          <SvgIcon fontSize="small" color="action">
+                            <EditIcon />
+                          </SvgIcon>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
             </TableBody>
           </Table>
         </Box>
       </PerfectScrollbar>
       <TablePagination
         component="div"
-        count={monitors&&monitors.length}
+        count={monitors && monitors.length}
         onPageChange={handlePageChange}
         onRowsPerPageChange={handleLimitChange}
         page={page}

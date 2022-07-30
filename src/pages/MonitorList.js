@@ -4,9 +4,7 @@
 /* eslint-disable linebreak-style */
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
-import {
-  Box, Container, Button, Modal, Grid
-} from '@material-ui/core';
+import { Box, Container, Button, Modal, Grid } from '@material-ui/core';
 import MonitorListResults from 'src/components/monitor/MonitorListResults';
 import MonitorListToolbar from 'src/components/monitor/MonitorListToolbar';
 // import monitors from '../__mocks__/monitors';
@@ -14,7 +12,6 @@ import { connect } from 'react-redux';
 import { COMPONENTS } from 'src/utils/constant';
 import { getUserComponentList } from '../store/action/user';
 import { useNavigate } from 'react-router-dom';
-
 
 const MonitorList = (props) => {
   const { monitorlist } = props || null;
@@ -34,7 +31,7 @@ const MonitorList = (props) => {
         console.log(err.errmessage);
       } else {
         console.log(monitorlist);
-        setmonitors(monitorlist ? monitorlist.list:[]);
+        setmonitors(monitorlist ? monitorlist.list : []);
         setLoader(true);
       }
     });
@@ -91,8 +88,7 @@ const MonitorList = (props) => {
                     color="success"
                     onClick={() => deleteplaylist()}
                   >
-                    Yes
-                    {' '}
+                    Yes{' '}
                   </Button>
                 </Grid>
                 <Grid item>
@@ -101,24 +97,28 @@ const MonitorList = (props) => {
                     color="error"
                     onClick={() => setModal(false)}
                   >
-                    No
-                    {' '}
+                    No{' '}
                   </Button>
                 </Grid>
               </Grid>
             </Box>
           </Modal>
-          <MonitorListToolbar 
-          onsearch={(e)=>setsearch(e)}
-          onclick={() => setModal(true)} />
+          <MonitorListToolbar
+            onsearch={(e) => setsearch(e)}
+            onclick={() => setModal(true)}
+          />
           <Box sx={{ pt: 3 }}>
-            <MonitorListResults setselected={setselected} search={search} monitors={monitors}
-             view={(e) =>
-              navigate('/app/savemonitor', { state: { ...e, type: 'View' } })
-            }
-            editcall={(e) =>
-              navigate('/app/savemonitor', { state:{...e, type: 'Edit'} })
-            } />
+            <MonitorListResults
+              setselected={setselected}
+              search={search}
+              monitors={monitors}
+              view={(e) =>
+                navigate('/app/savemonitor', { state: { ...e, type: 'View' } })
+              }
+              editcall={(e) =>
+                navigate('/app/savemonitor', { state: { ...e, type: 'Edit' } })
+              }
+            />
           </Box>
         </Container>
       </Box>
@@ -133,8 +133,8 @@ const mapStateToProps = ({ root = {} }) => {
   };
 };
 const mapDispatchToProps = (dispatch) => ({
-  getUserComponentList: (data, callback) => dispatch(getUserComponentList(data, callback)),
- 
+  getUserComponentList: (data, callback) =>
+    dispatch(getUserComponentList(data, callback))
 });
 
 export default connect(mapStateToProps, mapDispatchToProps)(MonitorList);

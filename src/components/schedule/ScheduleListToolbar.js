@@ -19,20 +19,17 @@ const ScheduleListToolbar = (props) => (
         justifyContent: 'flex-end'
       }}
     >
-      <Button sx={{ mx: 1 }} onClick={() => props.onclick()}>
-        <SvgIcon
-          fontSize="small"
-          color="action"
-        >
+      <Button
+        sx={{ mx: 1 }}
+        onClick={() => props.onclick()}
+        disabled={props.selectedSchedules.length === 0}
+      >
+        <SvgIcon fontSize="small" color="action">
           <Trash2Icon />
         </SvgIcon>
         Delete
       </Button>
-      <Button
-        color="primary"
-        variant="contained"
-        href="saveschedule"
-      >
+      <Button color="primary" variant="contained" href="saveschedule">
         Add Schedule
       </Button>
     </Box>
@@ -42,15 +39,11 @@ const ScheduleListToolbar = (props) => (
           <Box sx={{ maxWidth: 500 }}>
             <TextField
               fullWidth
-              onChange={(e)=>props.onsearch(e.target.value)}
-
+              onChange={(e) => props.onsearch(e.target.value)}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SvgIcon
-                      fontSize="small"
-                      color="action"
-                    >
+                    <SvgIcon fontSize="small" color="action">
                       <SearchIcon />
                     </SvgIcon>
                   </InputAdornment>

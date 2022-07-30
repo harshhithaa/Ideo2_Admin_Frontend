@@ -29,8 +29,7 @@ import {
 } from '@material-ui/core';
 import { COMPONENTS } from 'src/utils/constant';
 import { getUserComponentList, saveSchedule } from '../store/action/user';
-import {Alert, Stack} from '@mui/material';
-
+import { Alert, Stack } from '@mui/material';
 
 const SaveScheduleDetails = (props) => {
   const { component } = props || null;
@@ -59,7 +58,9 @@ const SaveScheduleDetails = (props) => {
   const [startDate, setStartDate] = useState((state && state.StartDate) || '');
   const [endDate, setEndDate] = useState((state && state.EndDate) || '');
   const [loader, setloader] = useState(true);
-  const [fixedTimePlayback, setFixedTimePlayback] = useState((state && state.FixedTimePlayback) || '');
+  const [fixedTimePlayback, setFixedTimePlayback] = useState(
+    (state && state.FixedTimePlayback) || ''
+  );
   const [type, settype] = useState(
     state && state.type === 'View'
       ? 'View'
@@ -68,14 +69,18 @@ const SaveScheduleDetails = (props) => {
       : 'Create'
   );
 
-  const [checked, setChecked] = useState((state && state.FixedTimePlayback) || false);
-  const [disable, setDisable] = useState(false);  
+  const [checked, setChecked] = useState(
+    (state && state.FixedTimePlayback) || false
+  );
+  const [disable, setDisable] = useState(false);
   let [box, setbox] = useState(false);
-  let [boxMessage, setboxMessage] = useState("");
-  let [color, setcolor] = useState("success");
-  var [days, setdaysr] = useState((state && state.Days ) || ['0','1','2','3','4','5','6']);
+  let [boxMessage, setboxMessage] = useState('');
+  let [color, setcolor] = useState('success');
+  var [days, setdaysr] = useState(
+    (state && state.Days) || ['0', '1', '2', '3', '4', '5', '6']
+  );
   const [disableBlock, setDisableBlock] = useState(false);
-  
+
   const [id, setId] = useState((state && state.ScheduleRef) || '');
 
   useEffect(() => {
@@ -140,13 +145,12 @@ const SaveScheduleDetails = (props) => {
     // setDisable(true);
     props.saveSchedule(saveScheduleDetails, (err) => {
       if (err.exists) {
-        
         console.log('err', err);
 
         setcolor('error');
         setboxMessage(err.errmessage);
         setbox(true);
-        
+
         // setdisable(false);
       } else {
         navigate('/app/schedules', { replace: true });
@@ -159,12 +163,11 @@ const SaveScheduleDetails = (props) => {
     if (days.includes(event.target.value)) {
       days = days.filter((item) => item !== event.target.value);
       console.log('days', days);
-      setdaysr((e)=>[...days])
+      setdaysr((e) => [...days]);
     } else {
       days.push(event.target.value);
       console.log('days', days);
-      setdaysr((e)=>[...days])
-
+      setdaysr((e) => [...days]);
     }
   };
   const handleChangeCheckboxForFTP = (event) => {
@@ -175,10 +178,10 @@ const SaveScheduleDetails = (props) => {
       console.log('fixedTimePlayback', fixedTimePlayback, event.target.checked);
 
       if (fixedTimePlayback) {
-        if((startDate>endDate) ||( startTime>endTime)){
+        if (startDate > endDate || startTime > endTime) {
           setDisable(true);
           console.log('date inappropriate');
-        }else{
+        } else {
           setDisable(false);
         }
       }
@@ -188,13 +191,12 @@ const SaveScheduleDetails = (props) => {
       console.log('fixedTimePlayback', fixedTimePlayback);
 
       if (!fixedTimePlayback) {
-        if(startDate>endDate){
+        if (startDate > endDate) {
           console.log('date inappropriate');
           setDisable(true);
-        }else{
+        } else {
           setDisable(false);
         }
-        
       }
     }
   };
@@ -204,10 +206,11 @@ const SaveScheduleDetails = (props) => {
       <Helmet>
         <title>Schedule | Ideogram</title>
       </Helmet>
-      { box?        
-       ( <Stack sx={{ width: '100%' }} spacing={2}>
-      <Alert severity={color}>{boxMessage}</Alert>
-    </Stack>):null}
+      {box ? (
+        <Stack sx={{ width: '100%' }} spacing={2}>
+          <Alert severity={color}>{boxMessage}</Alert>
+        </Stack>
+      ) : null}
       <Box
         sx={{
           backgroundColor: 'background.default',
@@ -277,7 +280,7 @@ const SaveScheduleDetails = (props) => {
                     setSelectedPlaylist(e.target.value);
                   }}
                 >
-                  { playlistData && playlistData.length > 0  ? (
+                  {playlistData && playlistData.length > 0 ? (
                     playlistData.map((item) => (
                       <MenuItem value={item.PlaylistRef}>
                         {`${item.Name}`}
@@ -350,7 +353,6 @@ const SaveScheduleDetails = (props) => {
                   value={endTime}
                   variant="outlined"
                 />
-                
 
                 <Box
                   sx={{
@@ -458,10 +460,11 @@ const SaveScheduleDetails = (props) => {
                     </FormGroup>
                   </FormControl>
                 </Box>
-                { box?        
-       ( <Stack sx={{ width: '100%' }} spacing={2}>
-      <Alert severity={color}>{boxMessage}</Alert>
-    </Stack>):null}
+                {box ? (
+                  <Stack sx={{ width: '100%' }} spacing={2}>
+                    <Alert severity={color}>{boxMessage}</Alert>
+                  </Stack>
+                ) : null}
                 <Box sx={{ py: 2 }}>
                   <Button
                     color="primary"

@@ -21,6 +21,7 @@ import {
   deleteComponentList
 } from '../store/action/user';
 import { useNavigate } from 'react-router-dom';
+import { Alert, Stack } from '@mui/material';
 
 const MediaList = (props) => {
   const { media } = props || {};
@@ -30,6 +31,10 @@ const MediaList = (props) => {
   const [showmodal, setModal] = useState(false);
   const [showErrModal, setErrModal] = useState(false);
   const [playlists, setPlaylists] = useState([]);
+
+  const [box, setbox] = useState(false);
+  const [boxMessage, setboxMessage] = useState('');
+  const [color, setcolor] = useState('success');
 
   const navigate = useNavigate();
 
@@ -71,17 +76,23 @@ const MediaList = (props) => {
         console.log(err);
       } else {
         if (err.err === 'attached') {
-          console.log(err.playlistsAttached)
+          console.log(err.componentsAttached);
           // setPlaylists(err.playlistsAttached);
-          err.playlistsAttached.forEach((item)=>{
-            setPlaylists(prev=>[...prev,item.PlaylistName])
-          })
+          err.componentsAttached.forEach((item) => {
+            setPlaylists((prev) => [...prev, item.PlaylistName]);
+          });
           setErrModal(true);
         } else {
           props.deleteComponentList(deleteData, (err) => {
             if (err.exists) {
+              setcolor('error');
+              setboxMessage(err.err);
+              setbox(true);
               console.log(err.errmessage);
             } else {
+              setcolor('success');
+              setboxMessage('Media Deleted Successfully!');
+              setbox(true);
               setLoader(false);
             }
           });
@@ -95,6 +106,11 @@ const MediaList = (props) => {
       <Helmet>
         <title>Media | Ideogram</title>
       </Helmet>
+      {box ? (
+        <Stack sx={{ width: '100%' }} spacing={2}>
+          <Alert severity={color}>{boxMessage}</Alert>
+        </Stack>
+      ) : null}
       <Box
         sx={{
           backgroundColor: 'background.default',
@@ -144,15 +160,15 @@ const MediaList = (props) => {
           >
             <Box sx={style}>
               <h4 id="parent-modal-title" style={{ marginBottom: 20 }}>
-                Cannot delete this media as it is running in {playlists.map(playlist=>(playlist))}{' '}
-                playlist
+                Cannot delete this media as it is running in{' '}
+                {playlists.map((playlist) => playlist)} playlist
               </h4>
               <Grid container>
                 <Grid item>
                   <Button
                     variant="contained"
                     color="success"
-                    onClick={() => (setErrModal(false),setPlaylists([]))}
+                    onClick={() => (setErrModal(false), setPlaylists([]))}
                   >
                     Ok
                   </Button>

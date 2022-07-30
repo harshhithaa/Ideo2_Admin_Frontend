@@ -11,9 +11,11 @@ import { connect } from 'react-redux';
 import { COMPONENTS } from 'src/utils/constant';
 import {
   getUserComponentList,
-  validateDeleteComponentList
+  validateDeleteComponentList,
+  deleteComponentList
 } from '../store/action/user';
 import { useNavigate } from 'react-router-dom';
+import { Alert, Stack } from '@mui/material';
 
 const ScheduleList = (props) => {
   const { schedule } = props || {};
@@ -21,7 +23,13 @@ const ScheduleList = (props) => {
   const [loader, setLoader] = useState(false);
   const [selected, setselected] = useState([]);
   const [showmodal, setModal] = useState(false);
+  const [showErrModal, setErrModal] = useState(false);
   const [search, setsearch] = useState('');
+  const [monitor, setMonitor] = useState([]);
+
+  const [box, setbox] = useState(false);
+  const [boxMessage, setboxMessage] = useState('');
+  const [color, setcolor] = useState('success');
 
   let navigate = useNavigate();
   useEffect(() => {
@@ -59,9 +67,29 @@ const ScheduleList = (props) => {
     setModal(false);
     props.validateDeleteComponentList(deleteData, (err) => {
       if (err.exists) {
-        console.log(err.errmessage);
+        console.log(err);
       } else {
-        setLoader(false);
+        if (err.err === 'attached') {
+          console.log(err.componentsAttached);
+          err.componentsAttached.forEach((item) => {
+            setMonitor((prev) => [...prev, item.MonitorName]);
+          });
+          setErrModal(true);
+        } else {
+          props.deleteComponentList(deleteData, (err) => {
+            if (err.exists) {
+              setcolor('error');
+              setboxMessage(err.err);
+              setbox(true);
+              console.log(err.errmessage);
+            } else {
+              setcolor('success');
+              setboxMessage('Schedule Deleted Successfully!');
+              setbox(true);
+              setLoader(false);
+            }
+          });
+        }
       }
     });
   };
@@ -70,6 +98,11 @@ const ScheduleList = (props) => {
       <Helmet>
         <title>Schedules | Ideogram</title>
       </Helmet>
+      {box ? (
+        <Stack sx={{ width: '100%' }} spacing={2}>
+          <Alert severity={color}>{boxMessage}</Alert>
+        </Stack>
+      ) : null}
       <Box
         sx={{
           backgroundColor: 'background.default',
@@ -85,9 +118,9 @@ const ScheduleList = (props) => {
             aria-describedby="modal-modal-description"
           >
             <Box sx={style}>
-              <h2 id="parent-modal-title" style={{ marginBottom: 20 }}>
+              <h4 id="parent-modal-title" style={{ marginBottom: 20 }}>
                 Are you sure you want to delete?
-              </h2>
+              </h4>
               <Grid container spacing={2}>
                 <Grid item>
                   <Button
@@ -110,21 +143,45 @@ const ScheduleList = (props) => {
               </Grid>
             </Box>
           </Modal>
-          <ScheduleListToolbar 
-                    onsearch={(e)=>setsearch(e)}
-
-          onclick={() => setModal(true)} />
+          <Modal
+            open={showErrModal}
+            onClose={() => setErrModal(false)}
+            aria-labelledby="modal-modal-title"
+            aria-describedby="modal-modal-description"
+          >
+            <Box sx={style}>
+              <h4 id="parent-modal-title" style={{ marginBottom: 20 }}>
+                Cannot delete this Schedule as it is running in{' '}
+                {monitor.map((monitor) => monitor)} monitor
+              </h4>
+              <Grid container>
+                <Grid item>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    onClick={() => (setErrModal(false), setMonitor([]))}
+                  >
+                    Ok
+                  </Button>
+                </Grid>
+              </Grid>
+            </Box>
+          </Modal>
+          <ScheduleListToolbar
+            onsearch={(e) => setsearch(e)}
+            onclick={() => setModal(true)}
+            selectedSchedules={selected}
+          />
           <Box sx={{ pt: 3 }}>
             <ScheduleListResults
               Schedules={scheduleItem}
               setselected={setselected}
               search={search}
-
               view={(e) =>
                 navigate('/app/saveschedule', { state: { ...e, type: 'View' } })
               }
               editcall={(e) =>
-                navigate('/app/saveschedule', { state:{...e, type: 'Edit'} })
+                navigate('/app/saveschedule', { state: { ...e, type: 'Edit' } })
               }
             />
           </Box>
@@ -142,8 +199,10 @@ const mapStateToProps = ({ root = {} }) => {
 const mapDispatchToProps = (dispatch) => ({
   getUserComponentList: (data, callback) =>
     dispatch(getUserComponentList(data, callback)),
-    validateDeleteComponentList: (data, callback) =>
-    dispatch(validateDeleteComponentList(data, callback))
+  validateDeleteComponentList: (data, callback) =>
+    dispatch(validateDeleteComponentList(data, callback)),
+  deleteComponentList: (data, callback) =>
+    dispatch(deleteComponentList(data, callback))
 });
 
 export default connect(mapStateToProps, mapDispatchToProps)(ScheduleList);
