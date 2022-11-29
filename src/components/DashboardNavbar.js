@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types */
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import PropTypes from 'prop-types';
 import { AppBar, Box, Hidden, IconButton, Toolbar } from '@material-ui/core';
 import MenuIcon from '@material-ui/icons/Menu';
@@ -26,7 +27,9 @@ const DashboardNavbar = (props, { onMobileNavOpen }) => {
                 if (!err.exists) {
                   localStorage.clear();
                   navigate('/login', { replace: true });
+                  console.log('after');
                 } else {
+                  localStorage.clear();
                   navigate('/login', { replace: true });
                 }
               });

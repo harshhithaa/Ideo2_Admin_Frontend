@@ -21,7 +21,13 @@ const ProductListToolbar = (props) => {
         }}
       >
         <Button sx={{ mx: 1 }}>Delete</Button>
-        <Button color="primary" variant="contained" href="savemedia">
+        <Button
+          color="primary"
+          variant="contained"
+          onClick={() => {
+            navigate('/app/savemedia');
+          }}
+        >
           Add Media
         </Button>
       </Box>

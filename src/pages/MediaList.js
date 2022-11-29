@@ -45,6 +45,8 @@ const MediaList = (props) => {
     props.getUserComponentList(data, (err) => {
       if (err.exists) {
         console.log(err);
+        localStorage.clear();
+        navigate('/login', { replace: true });
       } else {
         setMedia(media ? media.mediaList : []);
         setLoader(true);

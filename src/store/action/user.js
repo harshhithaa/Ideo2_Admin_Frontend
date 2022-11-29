@@ -97,8 +97,15 @@ export const getUserComponentList = (data, callback) => (dispatch) => {
           callback({ exists: false });
         } else {
           if (res.data.Error.ErrorCode === ErrorCode.Invalid_User_Credentials) {
-            localStorage.clear();
-            window.location.replace('/login');
+            // localStorage.clear();
+            // window.location.replace('/login');
+            dispatch({
+              type: STOREUSER,
+              payload: {
+                vaild: false,
+                accesstoken: null
+              }
+            });
           }
           console.log(
             'es.data.Error.ErrorMessage,',
@@ -250,8 +257,16 @@ export const logoutUser = (callback) => (dispatch) => {
           callback({ exits: false });
         } else {
           if (res.data.Error.ErrorCode === 10002) {
-            localStorage.clear();
-            this.props.history.push({ pathname: '/login' });
+            // localStorage.clear();
+            // this.props.history.push({ pathname: '/login' });
+            dispatch({
+              type: STOREUSER,
+              payload: {
+                vaild: false,
+                accesstoken: null
+              }
+            });
+            callback({ exits: true, err: res.data.Error.ErrorMessage });
           }
           callback({ exits: true, err: res.data.Error.ErrorMessage });
         }
@@ -284,8 +299,14 @@ export const saveMedia = (data, callback) => (dispatch) => {
           callback({ exists: false });
         } else {
           if (res.data.Error) {
-            localStorage.clear();
-            this.props.history.push({ pathname: '/login' });
+            dispatch({
+              type: STOREUSER,
+              payload: {
+                vaild: false,
+                accesstoken: null
+              }
+            });
+            // this.props.history.push({ pathname: '/login' });
           }
           callback({ exits: true, err: res.data.Error.ErrorMessage });
         }
@@ -327,7 +348,14 @@ export const validateDeleteComponentList = (data, callback) => (dispatch) => {
         } else {
           if (res.data.Error.ErrorCode === 10002) {
             // localStorage.clear();
-            this.props.history.push({ pathname: '/login' });
+            // this.props.history.push({ pathname: '/login' });
+            dispatch({
+              type: STOREUSER,
+              payload: {
+                vaild: false,
+                accesstoken: null
+              }
+            });
           }
           callback({ exits: true, err: res.data.Error.ErrorMessage });
         }
@@ -360,7 +388,14 @@ export const deleteComponentList = (data, callback) => (dispatch) => {
         } else {
           if (res.data.Error.ErrorCode === 10002) {
             // localStorage.clear();
-            this.props.history.push({ pathname: '/login' });
+            // this.props.history.push({ pathname: '/login' });
+            dispatch({
+              type: STOREUSER,
+              payload: {
+                vaild: false,
+                accesstoken: null
+              }
+            });
           }
           callback({ exits: true, err: res.data.Error.ErrorMessage });
         }
@@ -415,7 +450,13 @@ export const getUserComponentDetails = (data, callback) => (dispatch) => {
           callback({ exists: false });
         } else {
           if (res.data.Error.ErrorCode === ErrorCode.Invalid_User_Credentials) {
-            localStorage.clear();
+            dispatch({
+              type: STOREUSER,
+              payload: {
+                vaild: false,
+                accesstoken: null
+              }
+            });
           }
           console.log(
             'es.data.Error.ErrorMessage,',
