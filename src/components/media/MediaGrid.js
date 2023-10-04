@@ -51,7 +51,7 @@ const MediaGrid = (props) => {
       <ImageList
         sx={{ width: '100%', height: 450 }}
         variant="quilted"
-        cols={5}
+        cols={window.innerWidth < 500 ? 2 : 5}
         gap={8}
       >
         {media &&

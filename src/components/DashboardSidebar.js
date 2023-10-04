@@ -8,7 +8,8 @@ import {
   Calendar as CalendarIcon,
   Monitor as MonitorIcon,
   PlayCircle as PlayCircleIcon,
-  Film as FilmIcon
+  Film as FilmIcon,
+  PieChart as PieChartIcon
 } from 'react-feather';
 import NavItem from './NavItem';
 
@@ -38,6 +39,11 @@ const items = [
     icon: MonitorIcon,
     title: 'Monitors'
   }
+  // {
+  //   href: '/app/analytics',
+  //   icon: PieChartIcon,
+  //   title: 'Analytics'
+  // }
 ];
 
 const DashboardSidebar = ({ onMobileClose, openMobile }) => {

@@ -6,7 +6,13 @@
 import { Helmet } from 'react-helmet';
 import React, { useMemo, useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Button, Box, CircularProgress } from '@material-ui/core';
+import {
+  Button,
+  Box,
+  CircularProgress,
+  Snackbar,
+  Grid
+} from '@material-ui/core';
 import { connect } from 'react-redux';
 import { saveMedia } from '../store/action/user';
 import { Alert, Stack } from '@mui/material';
@@ -81,6 +87,8 @@ function StyledDropzone(props) {
   let [color, setcolor] = useState('success');
   const [disableButton, setDisableButton] = useState(true);
   const [compressedFile, setCompressedFile] = useState(null);
+  const [openSuccessSnackbar, setOpenSuccessSnackbar] = useState(false);
+  const [success, setSuccess] = useState(true);
   // const [inactive, setinactive] = useState(false);
 
   const options = {
@@ -136,21 +144,21 @@ function StyledDropzone(props) {
     [files]
   );
 
-  useEffect(() => {
-    files.map((file) => {
-      if (file.type.split('/')[0] === 'image') {
-        imageCompression(file, options).then((compressedFile) => {
-          var newFile = new File([compressedFile], compressedFile.name, {
-            type: 'image/jpeg'
-          });
-          setCompressedFile(newFile);
-          setDisableButton(false);
-        });
-      } else if (file.type.split('/')[0] === 'video') {
-        setDisableButton(false);
-      }
-    });
-  }, [files]);
+  // useEffect(() => {
+  //   files.map((file) => {
+  //     if (file.type.split('/')[0] === 'image') {
+  //       imageCompression(file, options).then((compressedFile) => {
+  //         var newFile = new File([compressedFile], compressedFile.name, {
+  //           type: 'image/jpeg'
+  //         });
+  //         setCompressedFile(newFile);
+  //         setDisableButton(false);
+  //       });
+  //     } else if (file.type.split('/')[0] === 'video') {
+  //       setDisableButton(false);
+  //     }
+  //   });
+  // }, [files]);
 
   function saveMediaData() {
     console.log('running saveMediaData');
@@ -159,11 +167,12 @@ function StyledDropzone(props) {
 
     files.forEach((i) => {
       console.log(i);
-      if (i.type.split('/')[0] === 'image') {
-        formdata.append('Media', compressedFile);
-      } else if (i.type.split('/')[0] === 'video') {
-        formdata.append('Media', i);
-      }
+      formdata.append('Media', i);
+      // if (i.type.split('/')[0] === 'image') {
+      //   formdata.append('Media', compressedFile);
+      // } else if (i.type.split('/')[0] === 'video') {
+      //   formdata.append('Media', i);
+      // }
     });
 
     setDisable(true);
@@ -175,6 +184,7 @@ function StyledDropzone(props) {
         setboxMessage(err.err);
         setbox(true);
         setDisable(false);
+        setSuccess(false);
       } else {
         setDisable(false);
         setFiles([]);
@@ -182,32 +192,56 @@ function StyledDropzone(props) {
         console.log('Success');
         setcolor('success');
         setboxMessage('Media Successfully added!');
+        setOpenSuccessSnackbar(true);
         setbox(true);
+        setSuccess(true);
       }
       setDisableButton(true);
     });
   }
 
+  const handleCloseSnackBar = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setOpenSuccessSnackbar(false);
+  };
+
   return (
-    <div className="container">
+    <Grid container direction={'column'}>
       <Helmet>
         <title>Add Media | Ideogram</title>
       </Helmet>
-      {box ? (
-        <Stack sx={{ width: '100%' }} spacing={2}>
-          <Alert severity={color}>{boxMessage}</Alert>
-        </Stack>
-      ) : null}
-      <div {...getRootProps({ style })}>
-        <input {...getInputProps()} />
-        <p>Drag and Drop your media here, or click to select</p>
-        <section className="container">
-          <aside style={thumbsContainer}>{thumbs}</aside>
-        </section>
-      </div>
 
-      <Box sx={{ py: 1, ml: 80 }}>{disable && <CircularProgress />}</Box>
-      <Box sx={{ py: 1, ml: 70 }}>
+      <Snackbar
+        open={openSuccessSnackbar}
+        key={'top'}
+        autoHideDuration={5000}
+        onClose={handleCloseSnackBar}
+      >
+        {!success ? (
+          <Alert onClose={handleCloseSnackBar} severity="error">
+            Something Went Wrong Please Try Again
+          </Alert>
+        ) : (
+          <Alert onClose={handleCloseSnackBar} severity="success">
+            Media Uploaded Successfully
+          </Alert>
+        )}
+      </Snackbar>
+      <Grid md={10} lg={12}>
+        <div {...getRootProps({ style })}>
+          <input {...getInputProps()} />
+          <p>Drag and Drop your media here, or click to select</p>
+          <section className="container">
+            <aside style={thumbsContainer}>{thumbs}</aside>
+          </section>
+        </div>
+      </Grid>
+      <Grid sx={{ py: 1 }} alignSelf={'center'}>
+        {disable && <CircularProgress />}
+      </Grid>
+      <Grid sx={{ py: 1 }} alignSelf={'center'}>
         <Button
           color="primary"
           size="large"
@@ -216,12 +250,12 @@ function StyledDropzone(props) {
           onClick={() => {
             saveMediaData();
           }}
-          disabled={disableButton}
+          disabled={disable}
         >
           Upload Media
         </Button>
-      </Box>
-    </div>
+      </Grid>
+    </Grid>
   );
 }
 

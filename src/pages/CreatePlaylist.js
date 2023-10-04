@@ -219,7 +219,7 @@ const CreatePlaylist = (props) => {
                       transform: 'translateZ(0)'
                     }}
                     rowHeight={200}
-                    cols={4}
+                    cols={window.innerWidth < 400 ? 2 : 4}
                     gap={1}
                   >
                     {media &&

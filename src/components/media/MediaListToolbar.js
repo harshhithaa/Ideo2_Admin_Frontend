@@ -5,7 +5,8 @@ import {
   CardContent,
   TextField,
   InputAdornment,
-  SvgIcon
+  SvgIcon,
+  Grid
 } from '@material-ui/core';
 import { Search as SearchIcon, Trash2 as Trash2Icon } from 'react-feather';
 import { useNavigate } from 'react-router';
@@ -14,11 +15,15 @@ const MediaListToolbar = (props) => {
   const navigate = useNavigate();
   return (
     <Box {...props}>
-      <Box
+      <Grid
         sx={{
           display: 'flex',
           justifyContent: 'flex-end'
         }}
+        container
+        lg={12}
+        md={10}
+        sm={2}
       >
         <Button
           sx={{ mx: 1 }}
@@ -30,18 +35,28 @@ const MediaListToolbar = (props) => {
           </SvgIcon>
           Delete
         </Button>
-        <Button
-          sx={{ mx: 1 }}
-          color="primary"
-          variant="contained"
-          href="createmedia"
-        >
-          Create Media
-        </Button>
-        <Button color="primary" variant="contained" href="savemedia">
-          Add Media
-        </Button>
-      </Box>
+        <Grid>
+          <Button color="primary" variant="contained" href="savemedia">
+            Add Media
+          </Button>
+          <Button
+            sx={{ mx: 1 }}
+            color="primary"
+            variant="contained"
+            href="createmedia"
+          >
+            Create Media
+          </Button>
+          <Button
+            sx={{ mt: window.innerWidth < 400 ? 1 : 0, mx: 1 }}
+            color="primary"
+            variant="contained"
+            href="splitmedia"
+          >
+            Create Split Screen
+          </Button>
+        </Grid>
+      </Grid>
       <Box sx={{ mt: 3 }}>
         <Card>
           <CardContent>

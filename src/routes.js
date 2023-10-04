@@ -19,6 +19,8 @@ import SaveSchedule from './pages/SaveSchedule';
 import SaveMonitor from './pages/SaveMonitor';
 import CustomizedMedia from './pages/CustomizedMedia';
 import EditImage from './pages/EditImage';
+import SplitMedia from './pages/SplitMedia';
+import Analytics from './pages/Analytics';
 
 const routes = [
   {
@@ -35,6 +37,8 @@ const routes = [
       { path: 'settings', element: <Settings /> },
       { path: 'savemedia', element: <SaveMedia /> },
       { path: 'createmedia', element: <CustomizedMedia /> },
+      { path: 'splitmedia', element: <SplitMedia /> },
+      { path: 'analytics', element: <Analytics /> },
       { path: 'media', element: <MediaList /> },
       { path: 'editimage', element: <EditImage /> },
       { path: 'saveschedule', element: <SaveSchedule /> },
