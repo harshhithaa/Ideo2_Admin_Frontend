@@ -10,6 +10,7 @@ import {
   GETUSERSCHEDULEDETAILS,
   GETUSERPLAYLISTDETAILS,
   GETUSERMONITORDETAILS,
+  SAVEMEDIA
 } from '../action/actionTypes';
 
 const initialState = {
@@ -37,6 +38,7 @@ const initialState = {
     isActive: 0,
   }
 };
+
 export default function userReducer(state = initialState, action) {
   switch (action.type) {
     case STOREUSER: {
@@ -102,6 +104,21 @@ export default function userReducer(state = initialState, action) {
         }
       };
     }
+
+    // ✅ FIX: Handle SAVEMEDIA to add new media to list
+    case SAVEMEDIA: {
+      return {
+        ...state,
+        user: {
+          ...state.user,
+          components: {
+            ...state.user.components,
+            mediaList: action.payload // payload should be updated media list from backend
+          }
+        }
+      };
+    }
+
     case GETUSERPLAYLISTDETAILS: {
       return {
         ...state,

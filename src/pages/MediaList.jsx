@@ -7,7 +7,6 @@ import { Helmet } from 'react-helmet-async';
 import {
   Box,
   Container,
-  Pagination,
   Button,
   Grid,
   Modal
@@ -27,7 +26,6 @@ import { Alert, Stack } from '@mui/material';
 const MediaList = (props) => {
   const { media } = props || {};
   const [mediaItem, setMedia] = useState([]);
-  const [loader, setLoader] = useState(false);
   const [selected, setselected] = useState([]);
   const [showmodal, setModal] = useState(false);
   const [showErrModal, setErrModal] = useState(false);
@@ -39,20 +37,29 @@ const MediaList = (props) => {
 
   const navigate = useNavigate();
 
-  // ✅ USE EFFECT - Triggers on loader change
+  // ✅ UPDATE mediaItem whenever Redux media changes
   useEffect(() => {
+    if (media?.mediaList && Array.isArray(media.mediaList)) {
+      setMedia(media.mediaList);
+      console.log('Media updated from Redux:', media.mediaList.length, 'items');
+    }
+  }, [media?.mediaList]);
+
+  // ✅ Initial fetch
+  useEffect(() => {
+    fetchMediaList();
+  }, []);
+
+  const fetchMediaList = () => {
     const data = { componenttype: COMPONENTS.Media };
     props.getUserComponentList(data, (err) => {
       if (err?.exists) {
         console.log(err);
         localStorage.clear();
         navigate('/login', { replace: true });
-      } else {
-        setMedia(props.media ? props.media.mediaList : []);
-        setLoader(true);
       }
     });
-  }, [loader]);
+  };
 
   const style = {
     position: 'absolute',
@@ -66,7 +73,6 @@ const MediaList = (props) => {
     p: 4
   };
 
-  // ✅ FIXED deleteComponent - with loader trigger
   const deleteComponent = () => {
     const deleteData = {
       ComponentType: COMPONENTS.Media,
@@ -94,7 +100,6 @@ const MediaList = (props) => {
         return;
       }
 
-      // Proceed with deletion
       props.deleteComponentList(deleteData, (delErr) => {
         if (delErr?.exists) {
           setcolor('error');
@@ -107,8 +112,8 @@ const MediaList = (props) => {
           setbox(true);
           setselected([]);
 
-          // ✅ KEY LINE - Trigger useEffect to refresh list
-          setLoader(false);
+          // ✅ Refresh media list after deletion
+          fetchMediaList();
         }
       });
     });
@@ -139,15 +144,12 @@ const MediaList = (props) => {
         }}
       >
         <Container maxWidth={false}>
-          {/* Delete Confirmation Modal */}
           <Modal
             open={showmodal}
             onClose={() => setModal(false)}
-            aria-labelledby="modal-modal-title"
-            aria-describedby="modal-modal-description"
           >
             <Box sx={style}>
-              <h4 id="parent-modal-title" style={{ marginBottom: 20 }}>
+              <h4 style={{ marginBottom: 20 }}>
                 Are you sure you want to delete {selected.length} item(s)?
               </h4>
               <Grid container spacing={2}>
@@ -173,15 +175,12 @@ const MediaList = (props) => {
             </Box>
           </Modal>
 
-          {/* Playlist Attachment Error Modal */}
           <Modal
             open={showErrModal}
             onClose={() => setErrModal(false)}
-            aria-labelledby="modal-modal-title"
-            aria-describedby="modal-modal-description"
           >
             <Box sx={style}>
-              <h4 id="parent-modal-title" style={{ marginBottom: 20 }}>
+              <h4 style={{ marginBottom: 20 }}>
                 Cannot delete this media as it is running in these playlists:
               </h4>
               <ul style={{ marginBottom: 20 }}>
@@ -206,7 +205,6 @@ const MediaList = (props) => {
             </Box>
           </Modal>
 
-          {/* ✅ FIXED - Correct prop name onClick (not onclick) */}
           <MediaListToolbar
             selectedItems={selected}
             onClick={() => setModal(true)}

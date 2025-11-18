@@ -281,6 +281,7 @@ export const logoutUser = (callback) => (dispatch) => {
 
 export const saveMedia = (data, callback) => (dispatch) => {
   const token = store.getState().root.user.accesstoken;
+  
   try {
     Api.post('/admin/savemedia', data, {
       headers: {
@@ -289,37 +290,63 @@ export const saveMedia = (data, callback) => (dispatch) => {
         type: 'formData',
         AuthToken: token
       },
-      // ✅ ADD THIS: Track upload progress
+      // ✅ Track upload progress ONLY
       onUploadProgress: (progressEvent) => {
-        callback(null, progressEvent);
+        if (progressEvent.lengthComputable) {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          console.log('Upload Progress:', percentCompleted + '%');
+          
+          // ✅ Send progress event with null as error (first parameter)
+          callback(null, progressEvent);
+        }
       }
     })
       .then((res) => {
+        console.log('✅ Upload Complete - API Response:', res.data);
+
         if (!res.data.Error) {
+          // ✅ Get the updated media list from backend response
+          const newMediaList = res.data.Details?.MediaList || [];
+          
+          console.log('📸 Dispatching SAVEMEDIA with', newMediaList.length, 'items');
+          
+          // ✅ Dispatch Redux action to update state
           dispatch({
             type: SAVEMEDIA,
-            payload: false
+            payload: newMediaList
           });
-          // ✅ Call callback with success (no progressEvent)
-          callback({ exists: false });
+
+          // ✅ Call callback with success (no progressEvent, just completion)
+          callback({ exists: false, success: true });
         } else {
-          if (res.data.Error) {
+          // ✅ Handle API error
+          if (res.data.Error.ErrorCode === 401) {
             dispatch({
               type: STOREUSER,
               payload: {
-                vaild: false,
+                valid: false,
                 accesstoken: null
               }
             });
           }
-          callback({ exits: true, err: res.data.Error.ErrorMessage });
+          callback({ 
+            exists: true, 
+            err: res.data.Error.ErrorMessage || 'Upload failed' 
+          });
         }
       })
-      .catch((errr) => {
-        callback({ exits: false, err: 'error', errr });
+      .catch((err) => {
+        console.error('❌ Upload Error:', err);
+        callback({ 
+          exists: true, 
+          err: err.message || 'Upload failed' 
+        });
       });
   } catch (error) {
-    console.log(error);
+    console.error('❌ Save Media Error:', error);
+    callback({ exists: true, err: 'Upload error' });
   }
 };
 

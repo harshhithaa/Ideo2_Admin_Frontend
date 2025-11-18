@@ -91,6 +91,8 @@ function StyledDropzone(props) {
   const [openSuccessSnackbar, setOpenSuccessSnackbar] = useState(false);
   const [success, setSuccess] = useState(true);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [showProgressBar, setShowProgressBar] = useState(false);
+  const [uploadComplete, setUploadComplete] = useState(false);
 
   const options = {
     maxSizeMB: 0.5,
@@ -139,7 +141,6 @@ function StyledDropzone(props) {
 
   useEffect(
     () => () => {
-      // Make sure to revoke the data uris to avoid memory leaks
       files.forEach((file) => URL.revokeObjectURL(file.preview));
     },
     [files]
@@ -164,37 +165,52 @@ function StyledDropzone(props) {
 
     setDisable(true);
     setUploadProgress(0);
+    setShowProgressBar(true);
+    setUploadComplete(false);
 
     props.saveMedia(formdata, (err, progressEvent) => {
-      // Handle progress updates
+      // ✅ FIX: Handle progress updates
       if (progressEvent) {
         const percent = Math.round(
           (progressEvent.loaded * 100) / progressEvent.total
         );
         setUploadProgress(percent);
-        return; // Don't process error/success yet
+        console.log('Upload progress:', percent + '%');
+
+        // ✅ KEY FIX: When progress reaches 100%, show success immediately
+        if (percent === 100) {
+          setUploadComplete(true);
+          setDisable(false);
+          setFiles([]);
+          setcolor('success');
+          setboxMessage('Media Successfully added!');
+          setOpenSuccessSnackbar(true);
+          setbox(true);
+          setSuccess(true);
+
+          // ✅ Hide progress bar after 1 second
+          setTimeout(() => {
+            setShowProgressBar(false);
+            setUploadProgress(0);
+            setUploadComplete(false);
+          }, 1000);
+        }
+        return;
       }
 
-      console.log('err', err);
+      // ✅ Handle error from API (if upload fails before reaching 100%)
       if (err?.exists) {
         setFiles([]);
         setcolor('error');
-        setboxMessage(err.err);
+        setboxMessage(err.err || 'Upload failed');
         setbox(true);
         setDisable(false);
         setSuccess(false);
-      } else {
-        setDisable(false);
-        setFiles([]);
-        console.log('Success');
-        setcolor('success');
-        setboxMessage('Media Successfully added!');
-        setOpenSuccessSnackbar(true);
-        setbox(true);
-        setSuccess(true);
+        setShowProgressBar(false);
+        setUploadProgress(0);
       }
+
       setDisableButton(true);
-      setUploadProgress(0);
     });
   }
 
@@ -232,8 +248,8 @@ function StyledDropzone(props) {
         <div {...getRootProps({ style })}>
           <input {...getInputProps()} />
 
-          {/* PROGRESS BAR — centered inside the white box */}
-          {disable && (
+          {/* ✅ FIXED PROGRESS BAR - Shows success immediately at 100% */}
+          {showProgressBar && (
             <Box
               sx={{
                 width: '60%',
@@ -247,10 +263,29 @@ function StyledDropzone(props) {
               <LinearProgress
                 variant="determinate"
                 value={uploadProgress}
-                sx={{ width: '100%', height: 8, borderRadius: 4 }}
+                sx={{
+                  width: '100%',
+                  height: 8,
+                  borderRadius: 4,
+                  transition: 'all 0.3s ease-in-out',
+                  backgroundColor: uploadProgress === 100 ? '#e8f5e9' : '#e0e0e0',
+                  '& .MuiLinearProgress-bar': {
+                    backgroundColor: uploadProgress === 100 ? '#4caf50' : '#2196f3',
+                    transition: 'background-color 0.3s ease-in-out'
+                  }
+                }}
               />
-              <Typography variant="body2" sx={{ mt: 1, color: '#2196f3' }}>
-                {uploadProgress}% Uploaded
+              <Typography
+                variant="body2"
+                sx={{
+                  mt: 1,
+                  color: uploadProgress === 100 ? '#4caf50' : '#2196f3',
+                  fontWeight: uploadProgress === 100 ? 700 : 400,
+                  fontSize: uploadProgress === 100 ? '1rem' : '0.875rem',
+                  transition: 'all 0.3s ease-in-out'
+                }}
+              >
+                {uploadProgress}% {uploadProgress === 100 ? '✓ Complete' : 'Uploading'}
               </Typography>
             </Box>
           )}
@@ -272,9 +307,9 @@ function StyledDropzone(props) {
           onClick={() => {
             saveMediaData();
           }}
-          disabled={disableButton || disable}
+          disabled={disableButton || disable || uploadComplete}
         >
-          Upload Media
+          {uploadComplete ? 'Upload Complete' : 'Upload Media'}
         </Button>
       </Grid>
     </Grid>

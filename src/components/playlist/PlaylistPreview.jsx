@@ -104,8 +104,8 @@ export default function PreviewModal({ Media }) {
             onChange={handleOrientation}
             size="small"
           >
-            <ToggleButton value="vertical">Vertical</ToggleButton>
-            <ToggleButton value="horizontal">Horizontal</ToggleButton>
+            <ToggleButton value="vertical">Portrait</ToggleButton>
+            <ToggleButton value="horizontal">Landscape</ToggleButton>
           </ToggleButtonGroup>
         </Box>
 

@@ -12,11 +12,13 @@ import {
   TextField,
   Typography,
   InputAdornment,
-  IconButton
+  IconButton,
+  Grid
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { connect } from 'react-redux';
 import { storeUser } from '../store/action/user';
+import ideogramLogo from '../assets/logo/ideogram_logo.png';
 
 const Login = (props) => {
   const navigate = useNavigate();
@@ -82,93 +84,206 @@ const Login = (props) => {
         sx={{
           backgroundColor: 'background.default',
           display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          justifyContent: 'center'
+          height: '100vh',
+          overflow: 'hidden'
         }}
       >
-        <Container maxWidth="sm">
-          <Formik onSubmit={OnSubmit}>
-            {({ handleBlur, handleSubmit, isSubmitting }) => (
-              <form onSubmit={handleSubmit}>
-                <Box sx={{ mb: 3 }}>
-                  <Typography color="textPrimary" variant="h2">
-                    Ideogram
-                  </Typography>
-                  <Typography
-                    color="textSecondary"
-                    gutterBottom
-                    variant="body2"
-                  >
-                    Sign in on the internal platform
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography color="error" gutterBottom variant="body2">
-                    {error}
-                  </Typography>
-                </Box>
-                <TextField
-                  fullWidth
-                  label="Email Address"
-                  margin="normal"
-                  name="email"
-                  onBlur={handleBlur}
-                  onChange={(e) => setEmail(e.target.value)}
-                  type="email"
-                  variant="outlined"
-                  required
-                />
-                <TextField
-                  fullWidth
-                  label="Password"
-                  margin="normal"
-                  name="password"
-                  onBlur={handleBlur}
-                  onChange={(e) => setPassword(e.target.value)}
-                  type={showPassword ? 'text' : 'password'}
-                  variant="outlined"
-                  required
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          aria-label="toggle password visibility"
-                          onClick={handleClickShowPassword}
-                          onMouseDown={handleMouseDownPassword}
-                          edge="end"
-                        >
-                          {showPassword ? <VisibilityOff /> : <Visibility />}
-                        </IconButton>
-                      </InputAdornment>
-                    )
-                  }}
-                />
-                <Box
-                  sx={{
-                    py: 2,
-                    display: 'flex',
-                    alignItems: 'center',
-                    flexDirection: 'column'
-                  }}
-                >
-                  {loader && <CircularProgress style={{ marginBottom: 10 }} />}
-                  <Button
-                    color="primary"
-                    disabled={isSubmitting}
+        {/* ✅ LEFT HALF - LOGO SECTION */}
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: '#f5f5f5',
+            padding: '40px',
+            '@media (max-width: 960px)': {
+              display: 'none'
+            }
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center'
+            }}
+          >
+            <img
+              src={ideogramLogo}
+              alt="Ideogram Logo"
+              style={{
+                maxWidth: '280px',
+                width: '100%',
+                height: 'auto',
+                marginBottom: '30px'
+              }}
+            />
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 700,
+                color: '#333',
+                mb: 2
+              }}
+            >
+              Welcome to Ideogram
+            </Typography>
+            <Typography
+              variant="body1"
+              sx={{
+                color: '#666',
+                lineHeight: 1.6,
+                maxWidth: '300px'
+              }}
+            >
+              Manage your digital displays with ease. Control content, schedules, and monitoring from one central platform.
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* ✅ RIGHT HALF - LOGIN FORM SECTION */}
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            padding: '40px',
+            backgroundColor: '#ffffff',
+            '@media (max-width: 960px)': {
+              flex: '1 1 100%'
+            }
+          }}
+        >
+          <Container maxWidth="sm" sx={{ width: '100%' }}>
+            <Formik onSubmit={OnSubmit}>
+              {({ handleBlur, handleSubmit, isSubmitting }) => (
+                <form onSubmit={handleSubmit}>
+                  {/* ✅ FORM HEADER */}
+                  <Box sx={{ mb: 4 }}>
+                    <Typography
+                      color="textPrimary"
+                      variant="h3"
+                      sx={{ fontWeight: 700, mb: 1 }}
+                    >
+                      Sign In
+                    </Typography>
+                    <Typography
+                      color="textSecondary"
+                      variant="body2"
+                    >
+                      Enter your credentials to access the platform
+                    </Typography>
+                  </Box>
+
+                  {/* ✅ ERROR MESSAGE */}
+                  {error && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography color="error" variant="body2">
+                        {error}
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* ✅ EMAIL FIELD */}
+                  <TextField
                     fullWidth
-                    onClick={OnSubmit}
-                    size="large"
-                    type="submit"
-                    variant="contained"
+                    label="Email Address"
+                    margin="normal"
+                    name="email"
+                    onBlur={handleBlur}
+                    onChange={(e) => setEmail(e.target.value)}
+                    type="email"
+                    variant="outlined"
+                    required
+                    sx={{
+                      mb: 2,
+                      '& .MuiOutlinedInput-root': {
+                        height: '48px'
+                      }
+                    }}
+                  />
+
+                  {/* ✅ PASSWORD FIELD WITH EYE TOGGLE */}
+                  <TextField
+                    fullWidth
+                    label="Password"
+                    margin="normal"
+                    name="password"
+                    onBlur={handleBlur}
+                    onChange={(e) => setPassword(e.target.value)}
+                    type={showPassword ? 'text' : 'password'}
+                    variant="outlined"
+                    required
+                    sx={{
+                      mb: 3,
+                      '& .MuiOutlinedInput-root': {
+                        height: '48px'
+                      }
+                    }}
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            aria-label="toggle password visibility"
+                            onClick={handleClickShowPassword}
+                            onMouseDown={handleMouseDownPassword}
+                            edge="end"
+                            sx={{
+                              color: '#1976d2'
+                            }}
+                          >
+                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                      )
+                    }}
+                  />
+
+                  {/* ✅ SUBMIT BUTTON */}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexDirection: 'column',
+                      mt: 2
+                    }}
                   >
-                    Sign in now
-                  </Button>
-                </Box>
-              </form>
-            )}
-          </Formik>
-        </Container>
+                    {loader && (
+                      <CircularProgress
+                        size={24}
+                        sx={{ marginBottom: 2 }}
+                      />
+                    )}
+                    <Button
+                      color="primary"
+                      disabled={isSubmitting || loader}
+                      fullWidth
+                      onClick={OnSubmit}
+                      size="large"
+                      type="submit"
+                      variant="contained"
+                      sx={{
+                        height: '48px',
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        borderRadius: '4px'
+                      }}
+                    >
+                      Sign in now
+                    </Button>
+                  </Box>
+                </form>
+              )}
+            </Formik>
+          </Container>
+        </Box>
       </Box>
     </>
   );
@@ -181,6 +296,7 @@ const mapStateToProps = ({ root = {} }) => {
     user
   };
 };
+
 const mapDispatchToProps = (dispatch) => ({
   storeUser: (data, callback) => dispatch(storeUser(data, callback))
 });
