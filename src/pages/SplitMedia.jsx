@@ -1,516 +1,479 @@
-import React, { useEffect } from 'react';
-import $ from 'jquery';
-import '../styles/splitmedia.css';
-import { Typography } from '@mui/material';
+import React, { useEffect, useState } from "react";
 
-const SplitMedia = () => {
-  $('#modelSelect').val(''); // Reset model selection on page refresh
+// Predefined model data
+const MODELS = [
+  { id: "11", name: "1 × 1", blocksX: 1, blocksY: 1, finalW: 1200, finalH: 1200 },
+  { id: "21", name: "2 × 1", blocksX: 2, blocksY: 1, finalW: 2400, finalH: 1200 },
+  { id: "12", name: "1 × 2", blocksX: 1, blocksY: 2, finalW: 1200, finalH: 2400 },
+  { id: "22", name: "2 × 2", blocksX: 2, blocksY: 2, finalW: 2400, finalH: 2400 },
+];
+
+const SplitScreenApp = () => {
+  const [orientation, setOrientation] = useState("landscape");
+  const [selectedModel, setSelectedModel] = useState("22");
+  const [uploadedImages, setUploadedImages] = useState([]);
 
   useEffect(() => {
-    document.getElementById('background').style.visibility = 'hidden'; // Hide canvas until model is selected
+    initializeBuilder();
+  }, [orientation, selectedModel]);
 
-    var link = document.getElementById('btn-download');
+  function initializeBuilder() {
+    const model = MODELS.find((m) => m.id === selectedModel);
+    if (!model) return;
 
-    link.addEventListener(
-      'click',
-      function (e) {
-        var canvas = document.createElement('canvas');
-        var context = canvas.getContext('2d');
+    const photoDiv = document.getElementById("photo");
+    if (!photoDiv) return;
 
-        var selectedOrientation =
-          document.getElementById('orientationSelect').value;
+    photoDiv.innerHTML = '<canvas id="background"></canvas>';
 
-        var selectedModel = document.getElementById('modelSelect').value;
-        if (selectedOrientation === 'landscape' && selectedModel === 'model1') {
-          canvas.width = 800;
-          canvas.height = 340;
-        } else if (
-          selectedOrientation === 'landscape' &&
-          selectedModel === 'model2'
-        ) {
-          canvas.width = 803;
-          canvas.height = 503;
-        } else if (
-          selectedOrientation === 'portrait' &&
-          selectedModel === 'model1'
-        ) {
-          canvas.width = 300;
-          canvas.height = 650;
-        } else if (
-          selectedOrientation === 'portrait' &&
-          selectedModel === 'model2'
-        ) {
-          canvas.width = 423;
-          canvas.height = 653;
-        }
+    const bgCanvas = document.getElementById("background");
+    const ctx = bgCanvas.getContext("2d");
 
-        // We need to get all images droped on all canvases and combine them on above canvas
-        $('#photo')
-          .children('canvas')
-          .each(function () {
-            var image = this;
+    bgCanvas.width = model.finalW;
+    bgCanvas.height = model.finalH;
 
-            if (
-              selectedOrientation === 'landscape' &&
-              selectedModel === 'model1'
-            ) {
-              context.beginPath(); // Simulate CSS padding around images by drawing white rectangles behind images on export
-              context.rect(
-                image.offsetLeft - 537,
-                image.offsetTop - 149,
-                image.width,
-                image.height
-              );
-              context.fillStyle = 'white';
-              context.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
 
-              context.drawImage(
-                image,
-                image.offsetLeft - 537,
-                image.offsetTop - 149,
-                image.width,
-                image.height
-              ); // Draw image
-            } else if (
-              selectedOrientation === 'landscape' &&
-              selectedModel === 'model2'
-            ) {
-              context.beginPath(); // Simulate CSS padding around images by drawing white rectangles behind images on export
-              context.rect(
-                image.offsetLeft - 537,
-                image.offsetTop - 149,
-                image.width,
-                image.height
-              );
-              context.fillStyle = 'white';
-              context.fill();
+    const blockW = bgCanvas.width / model.blocksX;
+    const blockH = bgCanvas.height / model.blocksY;
 
-              context.drawImage(
-                image,
-                image.offsetLeft - 537,
-                image.offsetTop - 149,
-                image.width,
-                image.height
-              ); // Draw image
-            } else if (
-              selectedOrientation === 'portrait' &&
-              selectedModel === 'model1'
-            ) {
-              context.beginPath(); // Simulate CSS padding around images by drawing white rectangles behind images on export
-              context.rect(
-                image.offsetLeft - 537,
-                image.offsetTop - 149,
-                image.width,
-                image.height
-              );
-              context.fillStyle = 'white';
-              context.fill();
+    // Draw grid
+    for (let y = 0; y < model.blocksY; y++) {
+      for (let x = 0; x < model.blocksX; x++) {
+        ctx.strokeStyle = "#d1d5db";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x * blockW, y * blockH, blockW, blockH);
 
-              context.drawImage(
-                image,
-                image.offsetLeft - 537,
-                image.offsetTop - 149,
-                image.width,
-                image.height
-              ); // Draw image
-            } else if (
-              selectedOrientation === 'portrait' &&
-              selectedModel === 'model2'
-            ) {
-              context.beginPath(); // Simulate CSS padding around images by drawing white rectangles behind images on export
-              context.rect(
-                image.offsetLeft - 537,
-                image.offsetTop - 149,
-                image.width,
-                image.height
-              );
-              context.fillStyle = 'white';
-              context.fill();
+        const id = `layer-${x}-${y}`;
+        const layerCanvas = document.createElement("canvas");
+        layerCanvas.id = id;
+        layerCanvas.width = blockW;
+        layerCanvas.height = blockH;
+        layerCanvas.style.position = "absolute";
+        layerCanvas.style.left = `${x * blockW}px`;
+        layerCanvas.style.top = `${y * blockH}px`;
+        layerCanvas.style.zIndex = 5;
+        layerCanvas.style.cursor = "pointer";
 
-              context.drawImage(
-                image,
-                image.offsetLeft - 537,
-                image.offsetTop - 149,
-                image.width,
-                image.height
-              ); // Draw image
-            }
-          });
-
-        link.href = canvas.toDataURL(); // Save all combined images to one image
-        link.download = `SplitMedia${Math.floor(Math.random() * 10000)}.png`; // Download the image
-      },
-      false
-    );
-
-    makeDroppable(document.querySelector('#dropZone'), function (files) {
-      var output = document.querySelector('#images_preview');
-      output.innerHTML = '';
-
-      for (var i = 0; i < files.length; i++) {
-        if (files[i].type.indexOf('image/') === 0) {
-          var reader = new FileReader();
-          reader.addEventListener(
-            'load',
-            function () {
-              var image = new Image();
-              image.id = Math.random().toString(36).substr(2, 9); // Generate image ID
-              image.height = 80;
-              image.width = 80;
-              image.src = this.result;
-
-              image.ondragstart = function (e) {
-                // Register drag event
-                e.dataTransfer.setData('text', e.target.id);
-              };
-
-              output.appendChild(image); // Add image preview to page
-            },
-            false
-          );
-          reader.readAsDataURL(files[i]);
-        }
+        photoDiv.appendChild(layerCanvas);
       }
-    });
-  }, []);
-
-  /***************************************
-   * Change model after drop-down select *
-   **************************************/
-  function modelSelect() {
-    var background = document.getElementById('background'); // Keep background canvas
-
-    var photo = document.getElementById('photo');
-    while (photo.firstChild) {
-      // Remove all child canvases
-      photo.removeChild(photo.firstChild);
     }
-    photo.appendChild(background); // Attach background canvas back
 
-    var selectedOrientation =
-      document.getElementById('orientationSelect').value;
-
-    var selectedModel = document.getElementById('modelSelect').value; // Get the selected model value
-
-    switch (selectedOrientation) {
-      case 'landscape':
-        if (selectedModel === 'model1') {
-          document.getElementById('background').style.visibility = 'visible'; // Make background canvas visible
-
-          background.width = 800;
-          background.height = 340;
-
-          var layer1 = document.createElement('canvas'); // Create first square canvas programmatically;
-          layer1.className = 'layer';
-
-          layer1.width = 400; // Set square canvas width
-          layer1.height = 340; // Set square canvas height
-          layer1.style.top = '149px'; // Position square canvas 130px from top
-          layer1.style.left = '537px'; // Position square canvas 540px from left
-          layer1.style.visibility = 'visible';
-
-          var body = document.getElementById('photo');
-          body.appendChild(layer1); // Add first square canvas to photo element on page
-          registerEvents(layer1); // Add event listeners that help drag & drop on canvas
-
-          var layer2 = document.createElement('canvas'); // Same as above ... create second square canvas.. etc
-          layer2.className = 'layer';
-          layer2.width = 400;
-          layer2.height = 340;
-          layer2.style.top = '149px';
-          layer2.style.left = '942px';
-          layer2.style.visibility = 'visible';
-
-          var body = document.getElementById('photo');
-          body.appendChild(layer2);
-          registerEvents(layer2);
-        } else if (selectedModel === 'model2') {
-          document.getElementById('background').style.visibility = 'visible'; // Make background canvas visible
-
-          background.width = 803;
-          background.height = 503;
-
-          var layer1 = document.createElement('canvas'); // Create first square canvas programmatically;
-          layer1.className = 'layer';
-          layer1.width = 400; // Set square canvas width
-          layer1.height = 250; // Set square canvas height
-          layer1.style.top = '149px'; // Position square canvas 130px from top
-          layer1.style.left = '537px'; // Position square canvas 540px from left
-          layer1.style.visibility = 'visible';
-
-          var body = document.getElementById('photo');
-          body.appendChild(layer1); // Add first square canvas to photo element on page
-          registerEvents(layer1); // Add event listeners that help drag & drop on canvas
-
-          var layer2 = document.createElement('canvas'); // Same as above ... create second square canvas.. etc
-          layer2.className = 'layer';
-          layer2.width = 400;
-          layer2.height = 250;
-          layer2.style.top = '149px';
-          layer2.style.left = '942px';
-          layer2.style.visibility = 'visible';
-
-          var body = document.getElementById('photo');
-          body.appendChild(layer2);
-          registerEvents(layer2);
-
-          var layer3 = document.createElement('canvas');
-          layer3.className = 'layer';
-          layer3.width = 400;
-          layer3.height = 250;
-          layer3.style.top = '402px';
-          layer3.style.left = '537px';
-          layer3.style.visibility = 'visible';
-
-          var body = document.getElementById('photo');
-          body.appendChild(layer3);
-          registerEvents(layer3);
-
-          var layer4 = document.createElement('canvas');
-          layer4.className = 'layer';
-          layer4.width = 400;
-          layer4.height = 250;
-          layer4.style.top = '402px';
-          layer4.style.left = '942px';
-          layer4.style.visibility = 'visible';
-
-          var body = document.getElementById('photo');
-          body.appendChild(layer4);
-          registerEvents(layer4);
-        }
-
-        break;
-      case 'portrait':
-        if (selectedModel === 'model1') {
-          document.getElementById('background').style.visibility = 'visible'; // Make background canvas visible
-
-          background.width = 300;
-          background.height = 650;
-
-          var layer1 = document.createElement('canvas'); // Create first square canvas programmatically;
-          layer1.className = 'layer';
-
-          layer1.width = 300; // Set square canvas width
-          layer1.height = 325; // Set square canvas height
-          layer1.style.top = '149px'; // Position square canvas 130px from top
-          layer1.style.left = '537px'; // Position square canvas 540px from left
-          layer1.style.visibility = 'visible';
-
-          var body = document.getElementById('photo');
-          body.appendChild(layer1); // Add first square canvas to photo element on page
-          registerEvents(layer1); // Add event listeners that help drag & drop on canvas
-
-          var layer2 = document.createElement('canvas'); // Same as above ... create second square canvas.. etc
-          layer2.className = 'layer';
-          layer2.width = 300;
-          layer2.height = 325;
-          layer2.style.top = '478px';
-          layer2.style.left = '537px';
-          layer2.style.visibility = 'visible';
-
-          var body = document.getElementById('photo');
-          body.appendChild(layer2);
-          registerEvents(layer2);
-        } else if (selectedModel === 'model2') {
-          document.getElementById('background').style.visibility = 'visible'; // Make background canvas visible
-
-          background.width = 423;
-          background.height = 653;
-
-          var layer1 = document.createElement('canvas'); // Create first square canvas programmatically;
-          layer1.className = 'layer';
-          layer1.width = 209; // Set square canvas width
-          layer1.height = 324; // Set square canvas height
-          layer1.style.top = '149px'; // Position square canvas 130px from top
-          layer1.style.left = '537px'; // Position square canvas 540px from left
-          layer1.style.visibility = 'visible';
-
-          var body = document.getElementById('photo');
-          body.appendChild(layer1); // Add first square canvas to photo element on page
-          registerEvents(layer1); // Add event listeners that help drag & drop on canvas
-
-          var layer2 = document.createElement('canvas'); // Same as above ... create second square canvas.. etc
-          layer2.className = 'layer';
-          layer2.width = 209;
-          layer2.height = 324;
-          layer2.style.top = '149px';
-          layer2.style.left = '751px';
-          layer2.style.visibility = 'visible';
-
-          var body = document.getElementById('photo');
-          body.appendChild(layer2);
-          registerEvents(layer2);
-
-          var layer3 = document.createElement('canvas');
-          layer3.className = 'layer';
-          layer3.width = 209;
-          layer3.height = 324;
-          layer3.style.top = '478px';
-          layer3.style.left = '537px';
-          layer3.style.visibility = 'visible';
-
-          var body = document.getElementById('photo');
-          body.appendChild(layer3);
-          registerEvents(layer3);
-
-          var layer4 = document.createElement('canvas');
-          layer4.className = 'layer';
-          layer4.width = 209;
-          layer4.height = 324;
-          layer4.style.top = '478px';
-          layer4.style.left = '751px';
-          layer4.style.visibility = 'visible';
-
-          var body = document.getElementById('photo');
-          body.appendChild(layer4);
-          registerEvents(layer4);
-        }
-        break;
-      default:
-        document.getElementById('background').style.visibility = 'hidden'; // Hide canvas until model is selected
-    }
+    enableDragToLayer();
+    enableImageReposition();
+    enableSave(model);
   }
 
-  function registerEvents(canvas) {
-    canvas.ondragenter = function () {
-      canvas.style.border = 'dashed 2px #555'; // Change the canvas borders when hovering
-    };
-    canvas.ondragleave = function () {
-      canvas.style.border = 'none'; // Reset canvas borders when hovering is not active
-    };
-    canvas.ondragover = function (e) {
-      e.preventDefault();
-    };
-    canvas.ondrop = function (e) {
-      e.preventDefault();
-      var id = e.dataTransfer.getData('text');
-      var dropImage = document.getElementById(id);
-      canvas.style.border = 'none'; // Reset canvas borders after image drop
-
-      var context = canvas.getContext('2d');
-      context.drawImage(dropImage, 0, 0, canvas.width, canvas.height); // Draw and stretch image to fill canvas
-    };
-  }
-
-  /*
-   * This file is used for drag & drop file upload and image preview
-   */
-
-  /************************************************************
-   * Add the JavaScript support for drag & drop/browse upload *
-   ***********************************************************/
-  function makeDroppable(element, callback) {
-    var input = document.createElement('input');
-    input.setAttribute('type', 'file');
-    input.setAttribute('multiple', true);
-    input.style.display = 'none';
-    input.addEventListener('change', function (e) {
-      triggerCallback(e, callback);
-    });
-    element.appendChild(input);
-
-    element.addEventListener('dragover', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      element.classList.add('dragover');
-    });
-
-    element.addEventListener('dragleave', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      element.classList.remove('dragover');
-    });
-
-    element.addEventListener('drop', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      element.classList.remove('dragover');
-      triggerCallback(e, callback);
-    });
-
-    element.addEventListener('click', function () {
-      input.value = null;
-      input.click();
+  function enableDragToLayer() {
+    const layers = document.querySelectorAll("canvas[id^='layer']");
+    layers.forEach((canvas) => {
+      canvas.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        canvas.style.opacity = "0.7";
+      });
+      
+      canvas.addEventListener("dragleave", (e) => {
+        canvas.style.opacity = "1";
+      });
+      
+      canvas.addEventListener("drop", (e) => {
+        e.preventDefault();
+        canvas.style.opacity = "1";
+        const id = e.dataTransfer.getData("text");
+        const img = document.getElementById(id);
+        if (!img) return;
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      });
     });
   }
 
-  function triggerCallback(e, callback) {
-    if (!callback || typeof callback !== 'function') {
+  function enableImageReposition() {
+    const layers = document.querySelectorAll("canvas[id^='layer']");
+    layers.forEach((canvas) => {
+      const ctx = canvas.getContext("2d");
+      let dragging = false;
+      let lastX = 0;
+      let lastY = 0;
+
+      canvas.addEventListener("mousedown", (e) => {
+        dragging = true;
+        lastX = e.offsetX;
+        lastY = e.offsetY;
+      });
+
+      canvas.addEventListener("mousemove", (e) => {
+        if (!dragging) return;
+        const dx = e.offsetX - lastX;
+        const dy = e.offsetY - lastY;
+
+        const temp = document.createElement("canvas");
+        temp.width = canvas.width;
+        temp.height = canvas.height;
+        temp.getContext("2d").drawImage(canvas, 0, 0);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(temp, dx, dy);
+
+        lastX = e.offsetX;
+        lastY = e.offsetY;
+      });
+
+      canvas.addEventListener("mouseup", () => (dragging = false));
+      canvas.addEventListener("mouseleave", () => (dragging = false));
+    });
+  }
+
+  function enableSave(model) {
+    const btn = document.getElementById("btn-download");
+    if (!btn) return;
+    
+    btn.onclick = function () {
+      const finalCanvas = document.createElement("canvas");
+      finalCanvas.width = model.finalW;
+      finalCanvas.height = model.finalH;
+      const ctx = finalCanvas.getContext("2d");
+
+      const bg = document.getElementById("background");
+      ctx.drawImage(bg, 0, 0);
+
+      document.querySelectorAll("canvas[id^='layer-']").forEach((layer) => {
+        const x = parseInt(layer.id.split("-")[1]);
+        const y = parseInt(layer.id.split("-")[2]);
+        const blockW = model.finalW / model.blocksX;
+        const blockH = model.finalH / model.blocksY;
+
+        ctx.drawImage(layer, x * blockW, y * blockH);
+      });
+
+      const link = document.createElement("a");
+      link.download = "split-media.png";
+      link.href = finalCanvas.toDataURL();
+      link.click();
+    };
+  }
+
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files);
+    
+    if (uploadedImages.length + files.length > 4) {
+      alert("Maximum 4 images allowed!");
       return;
     }
-    var files;
-    if (e.dataTransfer) {
-      files = e.dataTransfer.files;
-    } else if (e.target) {
-      files = e.target.files;
-    }
-    callback.call(null, files);
-  }
 
-  /*************************************************************************
-   * After drag & drop upload, create image elements and add image preview *
-   * Make images draggable to canvas and register mouse & drag events      *
-   ************************************************************************/
+    files.forEach((file) => {
+      if (file.type.indexOf("image/") === 0) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const id = Math.random().toString(36).substr(2, 9);
+          setUploadedImages((prev) => [
+            ...prev,
+            { id, src: event.target.result },
+          ]);
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  };
+
+  const handleDragStart = (e, id) => {
+    e.dataTransfer.setData("text", id);
+  };
+
+  const removeImage = (id) => {
+    setUploadedImages((prev) => prev.filter((img) => img.id !== id));
+  };
 
   return (
-    <>
-      <Typography color="textPrimary" variant="h2" textAlign={'center'}>
-        Create Split Screen
-      </Typography>
-      <div className="row">
-        <div className="column">
-          <div id="leftSide">
-            <div id="dropZone">
-              <p>
-                To upload your images <br />
-                Click <u>here</u>!
-              </p>
+    <div style={{ 
+      minHeight: "100vh", 
+      backgroundColor: "#f9fafb", 
+      padding: "20px",
+      paddingLeft: "280px"
+    }}>
+      
+      {/* Header */}
+      <div style={{ marginBottom: "30px" }}>
+        <h1 style={{ 
+          fontSize: "28px", 
+          fontWeight: "600",
+          margin: 0,
+          color: "#111827"
+        }}>
+          Split Screen
+        </h1>
+      </div>
+
+      {/* Main Content */}
+      <div style={{ 
+        display: "flex",
+        gap: "20px",
+        maxWidth: "1400px"
+      }}>
+        
+        {/* LEFT SIDE - Controls */}
+        <div style={{ width: "350px", display: "flex", flexDirection: "column", gap: "20px" }}>
+          
+          {/* Upload Section */}
+          <div style={{
+            backgroundColor: "#ffffff",
+            borderRadius: "8px",
+            border: "1px solid #e5e7eb",
+            padding: "20px"
+          }}>
+            <h3 style={{ 
+              fontSize: "16px", 
+              fontWeight: "600",
+              marginTop: 0,
+              marginBottom: "15px",
+              color: "#111827"
+            }}>
+              Upload Images
+            </h3>
+            
+            <label htmlFor="file-upload" style={{
+              display: "block",
+              padding: "40px 20px",
+              backgroundColor: "#f9fafb",
+              border: "2px dashed #d1d5db",
+              borderRadius: "8px",
+              textAlign: "center",
+              cursor: "pointer"
+            }}>
+              <div style={{ color: "#6b7280", fontSize: "14px" }}>
+                Click to upload or drag & drop<br/>
+                <span style={{ fontSize: "12px", color: "#9ca3af" }}>
+                  Maximum 4 images
+                </span>
+              </div>
+            </label>
+            
+            <input
+              id="file-upload"
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={handleFileUpload}
+              style={{ display: "none" }}
+            />
+
+            {/* Uploaded Images Grid */}
+            {uploadedImages.length > 0 && (
+              <div style={{ marginTop: "15px" }}>
+                <div style={{ 
+                  display: "grid", 
+                  gridTemplateColumns: "repeat(2, 1fr)",
+                  gap: "10px"
+                }}>
+                  {uploadedImages.map((img) => (
+                    <div
+                      key={img.id}
+                      style={{
+                        position: "relative",
+                        aspectRatio: "1",
+                        borderRadius: "6px",
+                        overflow: "hidden",
+                        border: "2px solid #e5e7eb",
+                        cursor: "grab",
+                        backgroundColor: "#fff"
+                      }}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, img.id)}
+                    >
+                      <img
+                        id={img.id}
+                        src={img.src}
+                        alt="upload"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover"
+                        }}
+                        draggable="false"
+                      />
+                      <button
+                        onClick={() => removeImage(img.id)}
+                        style={{
+                          position: "absolute",
+                          top: "5px",
+                          right: "5px",
+                          backgroundColor: "#fff",
+                          border: "1px solid #d1d5db",
+                          borderRadius: "4px",
+                          color: "#6b7280",
+                          width: "24px",
+                          height: "24px",
+                          cursor: "pointer",
+                          fontSize: "16px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center"
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ 
+                  fontSize: "12px", 
+                  color: "#9ca3af", 
+                  marginTop: "10px",
+                  marginBottom: 0 
+                }}>
+                  Drag images to canvas cells
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Options Section */}
+          <div style={{
+            backgroundColor: "#ffffff",
+            borderRadius: "8px",
+            border: "1px solid #e5e7eb",
+            padding: "20px"
+          }}>
+            <h3 style={{ 
+              fontSize: "16px", 
+              fontWeight: "600",
+              marginTop: 0,
+              marginBottom: "15px",
+              color: "#111827"
+            }}>
+              Layout Options
+            </h3>
+
+            {/* Orientation */}
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ 
+                display: "block", 
+                fontSize: "14px",
+                color: "#374151",
+                marginBottom: "8px",
+                fontWeight: "500"
+              }}>
+                Orientation
+              </label>
+              <select
+                value={orientation}
+                onChange={(e) => setOrientation(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #d1d5db",
+                  borderRadius: "6px",
+                  color: "#111827",
+                  fontSize: "14px",
+                  cursor: "pointer"
+                }}
+              >
+                <option value="landscape">Landscape</option>
+                <option value="portrait">Portrait</option>
+              </select>
             </div>
 
-            <div id="images_preview"></div>
+            {/* Grid Matrix */}
+            <div>
+              <label style={{ 
+                display: "block", 
+                fontSize: "14px",
+                color: "#374151",
+                marginBottom: "8px",
+                fontWeight: "500"
+              }}>
+                Grid Matrix
+              </label>
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #d1d5db",
+                  borderRadius: "6px",
+                  color: "#111827",
+                  fontSize: "14px",
+                  cursor: "pointer"
+                }}
+              >
+                {MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
 
-        <div id="photo">
-          <canvas id="background"></canvas>
-        </div>
-
-        <div id="images"></div>
-      </div>
-      <div style={{ marginTop: '20px' }}>
-        <div id="buttonsArea">
-          <select
-            id="orientationSelect"
-            onChange={() => {
-              modelSelect();
+          {/* Download Button */}
+          <button
+            id="btn-download"
+            style={{
+              width: "100%",
+              padding: "12px",
+              background: "#6366f1",
+              border: "none",
+              borderRadius: "6px",
+              color: "#fff",
+              fontSize: "14px",
+              fontWeight: "600",
+              cursor: "pointer"
             }}
           >
-            <option value="">Select the Orientation</option>
-            <option value="landscape">Landscape</option>
-            <option value="portrait">Portrait</option>
-          </select>
+            Download Split Media
+          </button>
+        </div>
 
-          <select
-            id="modelSelect"
-            onChange={() => {
-              modelSelect();
+        {/* RIGHT SIDE - Canvas Preview */}
+        <div style={{
+          flex: 1,
+          backgroundColor: "#ffffff",
+          borderRadius: "8px",
+          border: "1px solid #e5e7eb",
+          padding: "20px",
+          display: "flex",
+          flexDirection: "column"
+        }}>
+          <h3 style={{ 
+            fontSize: "16px", 
+            fontWeight: "600",
+            marginTop: 0,
+            marginBottom: "15px",
+            color: "#111827"
+          }}>
+            Canvas Preview
+          </h3>
+
+          <div 
+            id="photo" 
+            style={{ 
+              position: "relative",
+              flex: 1,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              overflow: "hidden",
+              minHeight: 0,
+              backgroundColor: "#f9fafb",
+              borderRadius: "6px"
             }}
-            style={{ marginTop: '10px' }}
           >
-            <option value="">Select the pattern</option>
-            <option value="model1">2x1</option>
-            <option value="model2">2x2</option>
-          </select>
-
-          <div style={{ marginTop: '10px' }}>
-            <a href="#" className="button" id="btn-download">
-              Save your Split Media
-            </a>
+            <canvas id="background" style={{ 
+              maxWidth: "100%", 
+              maxHeight: "100%",
+              height: "auto",
+              width: "auto"
+            }}></canvas>
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 
-export default SplitMedia;
+export default SplitScreenApp;

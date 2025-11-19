@@ -91,8 +91,9 @@ function StyledDropzone(props) {
   const [openSuccessSnackbar, setOpenSuccessSnackbar] = useState(false);
   const [success, setSuccess] = useState(true);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [showProgressBar, setShowProgressBar] = useState(false);
-  const [uploadComplete, setUploadComplete] = useState(false);
+
+  // New flag to avoid double showing success when we already showed at 100%
+  const [isUploadCompletedLocally, setIsUploadCompletedLocally] = useState(false);
 
   const options = {
     maxSizeMB: 0.5,
@@ -141,6 +142,7 @@ function StyledDropzone(props) {
 
   useEffect(
     () => () => {
+      // Make sure to revoke the data uris to avoid memory leaks
       files.forEach((file) => URL.revokeObjectURL(file.preview));
     },
     [files]
@@ -165,21 +167,50 @@ function StyledDropzone(props) {
 
     setDisable(true);
     setUploadProgress(0);
-    setShowProgressBar(true);
-    setUploadComplete(false);
+    setIsUploadCompletedLocally(false);
 
     props.saveMedia(formdata, (err, progressEvent) => {
-      // ✅ FIX: Handle progress updates
+      // Progress update from axios
       if (progressEvent) {
         const percent = Math.round(
           (progressEvent.loaded * 100) / progressEvent.total
         );
         setUploadProgress(percent);
-        console.log('Upload progress:', percent + '%');
 
-        // ✅ KEY FIX: When progress reaches 100%, show success immediately
-        if (percent === 100) {
-          setUploadComplete(true);
+        // If we reach 100% of upload, show success immediately (no time gap)
+        if (percent === 100 && !isUploadCompletedLocally) {
+          setIsUploadCompletedLocally(true);
+          setDisable(false);
+          setFiles([]);
+          setcolor('success');
+          setboxMessage('Media Uploaded Successfully');
+          setOpenSuccessSnackbar(true);
+          setbox(true);
+          setSuccess(true);
+          setDisableButton(true);
+          // keep uploadProgress at 100 until server finalizes
+        }
+
+        return; // don't process success/error here
+      }
+
+      // No progressEvent: final callback (success or error)
+      // Reset or handle errors depending on whether we already showed success
+      setUploadProgress(0);
+
+      if (err?.exists) {
+        // server-side error
+        setFiles([]);
+        setcolor('error');
+        setboxMessage(err.err || 'Upload failed');
+        setbox(true);
+        setDisable(false);
+        setSuccess(false);
+        setIsUploadCompletedLocally(false);
+      } else {
+        // success from server
+        if (!isUploadCompletedLocally) {
+          // if we didn't already show immediate success, show now
           setDisable(false);
           setFiles([]);
           setcolor('success');
@@ -187,30 +218,11 @@ function StyledDropzone(props) {
           setOpenSuccessSnackbar(true);
           setbox(true);
           setSuccess(true);
-
-          // ✅ Hide progress bar after 1 second
-          setTimeout(() => {
-            setShowProgressBar(false);
-            setUploadProgress(0);
-            setUploadComplete(false);
-          }, 1000);
+          setDisableButton(true);
         }
-        return;
+        // reset local flag
+        setIsUploadCompletedLocally(false);
       }
-
-      // ✅ Handle error from API (if upload fails before reaching 100%)
-      if (err?.exists) {
-        setFiles([]);
-        setcolor('error');
-        setboxMessage(err.err || 'Upload failed');
-        setbox(true);
-        setDisable(false);
-        setSuccess(false);
-        setShowProgressBar(false);
-        setUploadProgress(0);
-      }
-
-      setDisableButton(true);
     });
   }
 
@@ -248,8 +260,8 @@ function StyledDropzone(props) {
         <div {...getRootProps({ style })}>
           <input {...getInputProps()} />
 
-          {/* ✅ FIXED PROGRESS BAR - Shows success immediately at 100% */}
-          {showProgressBar && (
+          {/* PROGRESS BAR — centered inside the white box */}
+          {disable && (
             <Box
               sx={{
                 width: '60%',
@@ -263,29 +275,10 @@ function StyledDropzone(props) {
               <LinearProgress
                 variant="determinate"
                 value={uploadProgress}
-                sx={{
-                  width: '100%',
-                  height: 8,
-                  borderRadius: 4,
-                  transition: 'all 0.3s ease-in-out',
-                  backgroundColor: uploadProgress === 100 ? '#e8f5e9' : '#e0e0e0',
-                  '& .MuiLinearProgress-bar': {
-                    backgroundColor: uploadProgress === 100 ? '#4caf50' : '#2196f3',
-                    transition: 'background-color 0.3s ease-in-out'
-                  }
-                }}
+                sx={{ width: '100%', height: 8, borderRadius: 4 }}
               />
-              <Typography
-                variant="body2"
-                sx={{
-                  mt: 1,
-                  color: uploadProgress === 100 ? '#4caf50' : '#2196f3',
-                  fontWeight: uploadProgress === 100 ? 700 : 400,
-                  fontSize: uploadProgress === 100 ? '1rem' : '0.875rem',
-                  transition: 'all 0.3s ease-in-out'
-                }}
-              >
-                {uploadProgress}% {uploadProgress === 100 ? '✓ Complete' : 'Uploading'}
+              <Typography variant="body2" sx={{ mt: 1, color: '#2196f3' }}>
+                {uploadProgress}% Uploaded
               </Typography>
             </Box>
           )}
@@ -307,9 +300,9 @@ function StyledDropzone(props) {
           onClick={() => {
             saveMediaData();
           }}
-          disabled={disableButton || disable || uploadComplete}
+          disabled={disableButton || disable}
         >
-          {uploadComplete ? 'Upload Complete' : 'Upload Media'}
+          Upload Media
         </Button>
       </Grid>
     </Grid>

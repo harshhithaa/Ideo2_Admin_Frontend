@@ -58,21 +58,18 @@ export const storeUser = (data, callback) => (dispatch) => {
 export const getUserComponentList = (data, callback) => (dispatch) => {
   const token = store.getState().root.user.accesstoken;
   try {
-    Api.get(
-      '/admin/componentlist',
-
-      {
-        params: data,
-        headers: {
-          AuthToken: token
-        }
+    // Return the promise so callers can await it
+    return Api.get('/admin/componentlist', {
+      params: data,
+      headers: {
+        AuthToken: token
       }
-    )
+    })
       .then((res) => {
         if (!res.data.Error) {
           const dataObj = res.data.Details;
-
           console.log('getUserComponentList', dataObj);
+
           if (data.componenttype === COMPONENTS.Monitor) {
             dispatch({
               type: GETUSERCOMPONENTLIST,
@@ -94,31 +91,32 @@ export const getUserComponentList = (data, callback) => (dispatch) => {
               payload: dataObj.ComponentList
             });
           }
-          callback({ exists: false });
-        } else {
-          if (res.data.Error.ErrorCode === ErrorCode.Invalid_User_Credentials) {
-            // localStorage.clear();
-            // window.location.replace('/login');
-            dispatch({
-              type: STOREUSER,
-              payload: {
-                vaild: false,
-                accesstoken: null
-              }
-            });
-          }
-          console.log(
-            'es.data.Error.ErrorMessage,',
-            res.data.Error.ErrorMessage
-          );
-          callback({ exists: true, errmessage: res.data.Error.ErrorMessage });
+
+          if (typeof callback === 'function') callback({ exists: false, data: dataObj });
+          return dataObj;
         }
+
+        // error handling
+        if (res.data.Error.ErrorCode === ErrorCode.Invalid_User_Credentials) {
+          dispatch({
+            type: STOREUSER,
+            payload: {
+              vaild: false,
+              accesstoken: null
+            }
+          });
+        }
+        if (typeof callback === 'function') callback({ exists: true, errmessage: res.data.Error.ErrorMessage });
+        return Promise.reject(res.data.Error);
       })
       .catch((err) => {
-        console.log(err);
+        console.error('getUserComponentList error:', err);
+        if (typeof callback === 'function') callback({ exists: true, err: err });
+        throw err;
       });
   } catch (err) {
-    console.log(err);
+    if (typeof callback === 'function') callback({ exists: true, err });
+    return Promise.reject(err);
   }
 };
 
@@ -279,74 +277,56 @@ export const logoutUser = (callback) => (dispatch) => {
   }
 };
 
-export const saveMedia = (data, callback) => (dispatch) => {
+export const saveMedia = (data, callback) => async (dispatch) => {
   const token = store.getState().root.user.accesstoken;
-  
+
   try {
-    Api.post('/admin/savemedia', data, {
+    const res = await Api.post('/admin/savemedia', data, {
       headers: {
         'Content-Type': 'multipart/form-data',
         Accept: 'application/json',
-        type: 'formData',
         AuthToken: token
       },
-      // ✅ Track upload progress ONLY
       onUploadProgress: (progressEvent) => {
-        if (progressEvent.lengthComputable) {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          console.log('Upload Progress:', percentCompleted + '%');
-          
-          // ✅ Send progress event with null as error (first parameter)
-          callback(null, progressEvent);
+        if (progressEvent && progressEvent.lengthComputable) {
+          // forward progress events to UI (first param null = no error)
+          if (typeof callback === 'function') {
+            callback(null, progressEvent);
+          }
         }
       }
-    })
-      .then((res) => {
-        console.log('✅ Upload Complete - API Response:', res.data);
+    });
 
-        if (!res.data.Error) {
-          // ✅ Get the updated media list from backend response
-          const newMediaList = res.data.Details?.MediaList || [];
-          
-          console.log('📸 Dispatching SAVEMEDIA with', newMediaList.length, 'items');
-          
-          // ✅ Dispatch Redux action to update state
-          dispatch({
-            type: SAVEMEDIA,
-            payload: newMediaList
-          });
+    console.log('✅ Upload Complete - API Response:', res.data);
 
-          // ✅ Call callback with success (no progressEvent, just completion)
-          callback({ exists: false, success: true });
-        } else {
-          // ✅ Handle API error
-          if (res.data.Error.ErrorCode === 401) {
-            dispatch({
-              type: STOREUSER,
-              payload: {
-                valid: false,
-                accesstoken: null
-              }
-            });
+    if (!res.data.Error) {
+      // refresh the media list from server and wait for it to complete
+      try {
+        await dispatch(getUserComponentList({ componenttype: COMPONENTS.Media }));
+        console.log('Media list refreshed after upload');
+      } catch (refreshErr) {
+        console.warn('Failed to refresh media list after upload', refreshErr);
+      }
+
+      // final success callback (no progressEvent)
+      if (typeof callback === 'function') callback(null);
+    } else {
+      // API returned Error
+      if (res.data.Error.ErrorCode === ErrorCode.Invalid_User_Credentials) {
+        dispatch({
+          type: STOREUSER,
+          payload: {
+            valid: false,
+            accesstoken: null
           }
-          callback({ 
-            exists: true, 
-            err: res.data.Error.ErrorMessage || 'Upload failed' 
-          });
-        }
-      })
-      .catch((err) => {
-        console.error('❌ Upload Error:', err);
-        callback({ 
-          exists: true, 
-          err: err.message || 'Upload failed' 
         });
-      });
-  } catch (error) {
-    console.error('❌ Save Media Error:', error);
-    callback({ exists: true, err: 'Upload error' });
+      }
+      if (typeof callback === 'function')
+        callback({ exists: true, err: res.data.Error.ErrorMessage || 'Upload failed' });
+    }
+  } catch (err) {
+    console.error('❌ saveMedia error:', err);
+    if (typeof callback === 'function') callback({ exists: true, err: err.message || err });
   }
 };
 

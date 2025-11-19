@@ -88,7 +88,6 @@ const MonitorListResults = (props) => {
                   borderBottom: '2px solid #ddd'
                 }}
               >
-                {/* ✅ Checkbox column - centered */}
                 <TableCell
                   padding="checkbox"
                   align="center"
@@ -98,7 +97,7 @@ const MonitorListResults = (props) => {
                     color: '#333',
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
-                    width: '5%'
+                    width: '5%' // checkbox
                   }}
                 >
                   <Box sx={{ display: 'flex', justifyContent: 'center' }}>
@@ -115,7 +114,6 @@ const MonitorListResults = (props) => {
                   </Box>
                 </TableCell>
 
-                {/* ✅ BOLD COLUMN HEADERS - LEFT ALIGNED */}
                 <TableCell
                   align="left"
                   sx={{
@@ -125,7 +123,7 @@ const MonitorListResults = (props) => {
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
                     padding: '16px',
-                    width: '20%'
+                    width: '20%' // Monitor Name
                   }}
                 >
                   Monitor Name
@@ -140,7 +138,7 @@ const MonitorListResults = (props) => {
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
                     padding: '16px',
-                    width: '20%'
+                    width: '45%' // Description (expanded)
                   }}
                 >
                   Description
@@ -155,7 +153,7 @@ const MonitorListResults = (props) => {
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
                     padding: '16px',
-                    width: '35%'
+                    width: '20%' // Default Playlist (reduced)
                   }}
                 >
                   Default Playlist
@@ -170,7 +168,7 @@ const MonitorListResults = (props) => {
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
                     padding: '16px',
-                    width: '10%'
+                    width: '10%' // edit button column
                   }}
                 >
                   Edit
@@ -238,7 +236,7 @@ const MonitorListResults = (props) => {
                           cursor: 'pointer',
                           fontWeight: 500,
                           color: '#1976d2',
-                          width: '20%',
+                          width: '20%', // match header
                           '&:hover': {
                             textDecoration: 'underline'
                           }
@@ -256,7 +254,6 @@ const MonitorListResults = (props) => {
                         </Box>
                       </TableCell>
 
-                      {/* ✅ Description - left aligned */}
                       <TableCell
                         align="left"
                         onClick={() => props.view && props.view(monitor)}
@@ -265,7 +262,7 @@ const MonitorListResults = (props) => {
                           cursor: 'pointer',
                           color: '#666',
                           fontSize: '0.9rem',
-                          width: '20%',
+                          width: '45%', // match header (expanded)
                           '&:hover': {
                             backgroundColor: '#fafafa'
                           }
@@ -276,7 +273,6 @@ const MonitorListResults = (props) => {
                           : monitor.Description}
                       </TableCell>
 
-                      {/* ✅ Default Playlist - left aligned */}
                       <TableCell
                         align="left"
                         onClick={() => props.view && props.view(monitor)}
@@ -285,7 +281,7 @@ const MonitorListResults = (props) => {
                           cursor: 'pointer',
                           color: '#666',
                           fontSize: '0.9rem',
-                          width: '35%',
+                          width: '20%', // match header (reduced)
                           '&:hover': {
                             backgroundColor: '#fafafa'
                           }
@@ -294,10 +290,9 @@ const MonitorListResults = (props) => {
                         {monitor.DefaultPlaylistName}
                       </TableCell>
 
-                      {/* ✅ Edit - centered */}
                       <TableCell
                         align="center"
-                        sx={{ padding: '16px', width: '10%' }}
+                        sx={{ padding: '16px', width: '10%' }} // match header
                       >
                         <Button
                           sx={{
