@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable linebreak-style */
 /* eslint-disable react/prop-types */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 
 import {
@@ -30,6 +30,7 @@ const MediaList = (props) => {
   const [showmodal, setModal] = useState(false);
   const [showErrModal, setErrModal] = useState(false);
   const [playlists, setPlaylists] = useState([]);
+  const [searchQuery, setSearchQuery] = useState(''); // new
 
   const [box, setbox] = useState(false);
   const [boxMessage, setboxMessage] = useState('');
@@ -44,6 +45,13 @@ const MediaList = (props) => {
       console.log('Media updated from Redux:', media.mediaList.length, 'items');
     }
   }, [media?.mediaList]);
+
+  // filtered media according to search query (keeps categories intact in MediaGrid)
+  const filteredMedia = useMemo(() => {
+    if (!searchQuery || searchQuery.trim() === '') return mediaItem;
+    const q = searchQuery.toLowerCase();
+    return mediaItem.filter((m) => (m?.MediaName || '').toLowerCase().includes(q));
+  }, [mediaItem, searchQuery]);
 
   // ✅ Initial fetch
   useEffect(() => {
@@ -139,7 +147,8 @@ const MediaList = (props) => {
       <Box
         sx={{
           backgroundColor: 'background.default',
-          minHeight: '100%',
+          height: '100vh',          // take full viewport height so only inner grid scrolls
+          overflow: 'hidden',       // prevent outer scrollbar
           py: 3
         }}
       >
@@ -205,17 +214,23 @@ const MediaList = (props) => {
             </Box>
           </Modal>
 
-          <MediaListToolbar
-            selectedItems={selected}
-            onClick={() => setModal(true)}
-          />
+          {/* make the toolbar sticky so top buttons/search don't scroll away */}
+          <Box sx={{ position: 'sticky', top: 12, zIndex: 1200, backgroundColor: 'background.default', pb: 1 }}>
+            <MediaListToolbar
+              media={mediaItem}            // <-- keep full media for any toolbar needs
+              query={searchQuery}
+              onQueryChange={setSearchQuery}
+              selectedItems={selected}
+              onClick={() => setModal(true)}
+            />
+          </Box>
 
-          <MediaGrid media={mediaItem} setselected={setselected} />
-        </Container>
-      </Box>
-    </>
-  );
-};
+          <MediaGrid media={mediaItem} setselected={setselected} query={searchQuery} />
+         </Container>
+       </Box>
+     </>
+   );
+ };
 
 const mapStateToProps = ({ root = {} }) => {
   const media = root.user?.components;
