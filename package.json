@@ -42,6 +42,7 @@
     "dayjs": "^1.11.13",
     "dotenv": "^16.4.5",
     "file-saver": "^2.0.5",
+    "filerobot-image-editor": "^4.8.1",
     "formik": "^2.4.6",
     "history": "^5.3.0",
     "jquery": "^3.7.1",
