@@ -13,10 +13,15 @@ import {
   Grid,
   LinearProgress,
   Typography,
-  Alert
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import { connect } from 'react-redux';
 import { saveMedia } from '../store/action/user';
+import { useNavigate } from 'react-router-dom';
 
 const baseStyle = {
   flex: 1,
@@ -24,7 +29,7 @@ const baseStyle = {
   flexDirection: 'column',
   alignItems: 'center',
   padding: '48px',
-  margin: '40px',
+  margin: 0,
   borderWidth: 2,
   borderRadius: 6,
   borderColor: '#e0e0e0',
@@ -137,6 +142,7 @@ function SaveMedia(props) {
   const [snackSeverity, setSnackSeverity] = useState('success');
   const [snackMessage, setSnackMessage] = useState('');
   const inputRef = useRef(null);
+  const navigate = useNavigate();
 
   // new ref to mark when we've handled 100% locally to avoid delay / duplicate handling
   const uploadedLocallyRef = useRef(false);
@@ -257,6 +263,47 @@ function SaveMedia(props) {
 
   const inputProps = getInputProps();
 
+  // helper to go to Media list and close dialog
+  const goToMediaLibrary = () => {
+    setOpenSnackbar(false);
+
+    // 1) Try to find an in-app link (sidebar/menu) that already points to Media and follow it.
+    //    This is robust across apps using different base paths (SPA or hash router).
+    const anchor =
+      document.querySelector('a[href*="/media"]') ||
+      document.querySelector('a[href*="#/media"]') ||
+      document.querySelector('a[href*="media"]');
+
+    if (anchor) {
+      const href = anchor.getAttribute('href') || '';
+      if (href.startsWith('#')) {
+        // hash route
+        window.location.hash = href.replace(/^#/, '');
+        return;
+      }
+      if (href.startsWith('/')) {
+        // SPA route — use router navigation
+        navigate(href);
+        return;
+      }
+      // fallback to full href
+      window.location.href = href;
+      return;
+    }
+
+    // 2) Fallback: try common routes. Use navigate() first (SPA). If your app uses hash routing,
+    //    uncomment the hash fallback below.
+    try {
+      navigate('/media');
+      return;
+    } catch (e) {
+      // nothing
+    }
+
+    // last resort: attempt hash-based navigation
+    window.location.href = `${window.location.origin}/#/media`;
+  };
+
   function saveMediaData() {
     if (files.length === 0) {
       setSnackSeverity('error');
@@ -286,7 +333,7 @@ function SaveMedia(props) {
           setUploading(false);
           setUploadProgress(100);
           setSnackSeverity('success');
-          setSnackMessage('Media Uploaded Successfully');
+          setSnackMessage('Media uploaded successfully. View it in Media Library.');
           setOpenSnackbar(true);
 
           // cleanup previews and clear selection
@@ -319,7 +366,7 @@ function SaveMedia(props) {
         setOpenSnackbar(true);
       } else {
         setSnackSeverity('success');
-        setSnackMessage('Media uploaded successfully');
+        setSnackMessage('Media uploaded successfully. View it in Media Library.');
         setOpenSnackbar(true);
         files.forEach((f) => {
           try { if (f.preview) URL.revokeObjectURL(f.preview); } catch (e) {}
@@ -332,12 +379,34 @@ function SaveMedia(props) {
   }
 
   return (
-    <Grid container direction="column">
+    <Grid container direction="column" sx={{ minHeight: '100vh', alignItems: 'center', justifyContent: 'center' }}>
       <Helmet><title>Add Media | Ideogram</title></Helmet>
 
-      <Snackbar open={openSnackbar} autoHideDuration={4000} onClose={() => setOpenSnackbar(false)}>
-        <Alert onClose={() => setOpenSnackbar(false)} severity={snackSeverity}>{snackMessage}</Alert>
-      </Snackbar>
+      {/* Centered result dialog (success / error). Contains optional action to go to Media Library */}
+      <Dialog
+        open={openSnackbar}
+        onClose={() => setOpenSnackbar(false)}
+        aria-labelledby="upload-result-title"
+      >
+        <DialogTitle id="upload-result-title" sx={{ textAlign: 'center' }}>
+          {snackSeverity === 'success' ? 'Success' : 'Notice'}
+        </DialogTitle>
+        <DialogContent sx={{ minWidth: 320, display: 'flex', justifyContent: 'center' }}>
+          <Alert severity={snackSeverity} sx={{ width: '100%', textAlign: 'center' }}>
+            {snackMessage}
+          </Alert>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 2 }}>
+          {snackSeverity === 'success' && (
+            <Button onClick={goToMediaLibrary} variant="contained" color="primary" size="small">
+              Go to Media Library
+            </Button>
+          )}
+          <Button onClick={() => setOpenSnackbar(false)} variant="outlined" size="small">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Grid md={10} lg={12}>
         <div {...getRootProps({ style })}>

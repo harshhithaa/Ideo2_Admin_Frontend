@@ -225,7 +225,7 @@ const MediaList = (props) => {
             />
           </Box>
 
-          <MediaGrid media={mediaItem} setselected={setselected} query={searchQuery} />
+          <MediaGrid media={mediaItem} setselected={setselected} selected={selected} query={searchQuery} />
          </Container>
        </Box>
      </>
