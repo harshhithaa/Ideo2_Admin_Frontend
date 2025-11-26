@@ -84,6 +84,10 @@ const SaveMonitorDetails = (props) => {
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [clashingSchedulesError, setClashingSchedulesError] = useState('');
 
+  // only apply auto-close behavior for Edit monitors page
+  const isEdit = state && state.type === 'Edit';
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  
   var clashingSchedules = [];
 
   const min = 5;
@@ -516,72 +520,237 @@ const SaveMonitorDetails = (props) => {
                       <InputLabel id="select-playlist" sx={{ fontWeight: 600, mb: 1, display: 'block' }}>
                         Default Playlist
                       </InputLabel>
-                      <Select
-                        labelId="select-playlist"
-                        id="select-playlist"
-                        value={selectedPlaylist}
-                        label="playlist"
-                        onChange={(e) => setSelectedPlaylist(e.target.value)}
-                        size="small"
-                        fullWidth
-                        sx={{ borderRadius: 1, '& .MuiSelect-select': { padding: '10px 12px' } }}
-                        MenuProps={{ PaperProps: { sx: { maxHeight: 300 } } }}
-                      >
-                        {playlistData && playlistData.length > 0 ? (
-                          playlistData.map((item) => (
-                            <MenuItem key={item.PlaylistRef} value={item.PlaylistRef}>
-                              {item.Name}
-                            </MenuItem>
-                          ))
-                        ) : (
-                          <MenuItem>No Items available</MenuItem>
-                        )}
-                      </Select>
+
+                      {/* In View mode show a read-only boxed value (no dropdown). Otherwise keep Select unchanged. */}
+                      {state && state.type === 'View' ? (
+                        <Box
+                          sx={{
+                            height: 40,
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            px: 2,
+                            py: 1,
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {playlistData && playlistData.length > 0
+                              ? (playlistData.find((p) => p.PlaylistRef === selectedPlaylist) || {}).Name || 'No Items available'
+                              : 'No Items available'}
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <Select
+                          labelId="select-playlist"
+                          id="select-playlist"
+                          value={selectedPlaylist}
+                          label="playlist"
+                          onChange={(e) => setSelectedPlaylist(e.target.value)}
+                          size="small"
+                          fullWidth
+                          sx={{ borderRadius: 1, '& .MuiSelect-select': { padding: '10px 12px' } }}
+                          MenuProps={{ PaperProps: { sx: { maxHeight: 300 } } }}
+                        >
+                          {playlistData && playlistData.length > 0 ? (
+                            playlistData.map((item) => (
+                              <MenuItem key={item.PlaylistRef} value={item.PlaylistRef}>
+                                {item.Name}
+                              </MenuItem>
+                            ))
+                          ) : (
+                            <MenuItem>No Items available</MenuItem>
+                          )}
+                        </Select>
+                      )}
                     </Box>
 
                     <Box sx={{ width: controlWidth }}>
                       <InputLabel id="select-schedule" sx={{ fontWeight: 600, mb: 1 }}>
                         Schedule
                       </InputLabel>
-                      <Select
-                        labelId="select-schedule"
-                        id="select-schedule"
-                        multiple
-                        value={selectedSchedule}
-                        renderValue={(selected) => (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                            {selected.map((value, index) => (
-                              <Chip
-                                key={index}
-                                label={`${value.Title} (${value.StartTime} - ${value.EndTime}) (${value.StartDate} - ${value.EndDate})`}
-                                style={{ margin: 2 }}
-                                clickable
-                                onDelete={(e) => handleRemoveSchedule(e, value)}
-                                deleteIcon={<CancelRounded onMouseDown={(event) => event.stopPropagation()} />}
-                              />
-                            ))}
+
+                      {/* If View mode, show read-only chips (no dropdown). Otherwise keep existing Select. */}
+                      {state && state.type === 'View' ? (
+                        // keep the same boxed appearance as the editable Select field,
+                        // without changing chip styles or layout
+                        <Box
+                          sx={{
+                            height: 135,
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            px: 1,
+                            py: 0.5,
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            display: 'flex',
+                            alignItems: 'flex-start'
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 3,
+                              maxHeight: 125,
+                              overflowY: 'auto',
+                              overflowX: 'hidden',
+                              paddingRight: 6,
+                              width: '100%'
+                            }}
+                          >
+                            {selectedSchedule && selectedSchedule.length > 0 ? (
+                              selectedSchedule.map((value, index) => (
+                                <div key={index} style={{ width: '90%' }}>
+                                  <Chip
+                                    label={`${value.Title} (${value.StartTime} - ${value.EndTime}) (${value.StartDate} - ${value.EndDate})`}
+                                    style={{
+                                      margin: 2,
+                                      width: '100%',
+                                      boxSizing: 'border-box',
+                                      overflow: 'hidden',
+                                      whiteSpace: 'nowrap',
+                                      textOverflow: 'ellipsis',
+                                      position: 'relative'
+                                    }}
+                                  />
+                                </div>
+                              ))
+                            ) : (
+                              <Typography variant="body2">No Items available</Typography>
+                            )}
                           </div>
-                        )}
-                        onChange={handleChange}
-                        size="small"
-                        fullWidth
-                        sx={{ '& .MuiSelect-select': { minHeight: 40 } }}
-                      >
-                        {scheduleData && scheduleData.length > 0 ? (
-                          scheduleData.map((item) => {
-                            if (!IsValuePresentInArray(selectedSchedule, 'ScheduleRef', item.ScheduleRef)) {
+                        </Box>
+                      ) : (
+                        <Select
+                          labelId="select-schedule"
+                          id="select-schedule"
+                          multiple
+                          value={selectedSchedule}
+                          renderValue={(selected) => (
+                            <div
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 3,
+                                maxHeight: 125,
+                                overflowY: 'auto',
+                                overflowX: 'hidden',
+                                paddingRight: 6,
+                                width: '100%'
+                              }}
+                            >
+                              {selected.map((value, index) => (
+                                <div key={index} style={{ width: '90%' }}>
+                                  <Chip
+                                    label={`${value.Title} (${value.StartTime} - ${value.EndTime}) (${value.StartDate} - ${value.EndDate})`}
+                                    style={{
+                                      margin: 2,
+                                      width: '100%',
+                                      boxSizing: 'border-box',
+                                      overflow: 'hidden',
+                                      whiteSpace: 'nowrap',
+                                      textOverflow: 'ellipsis',
+                                      position: 'relative'
+                                    }}
+                                    clickable
+                                    onDelete={(e) => handleRemoveSchedule(e, value)}
+                                    deleteIcon={
+                                      <CancelRounded
+                                        style={{ position: 'absolute', right: 8 }}
+                                        onMouseDown={(event) => event.stopPropagation()}
+                                      />
+                                    }
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          onChange={(e) => {
+                            handleChange(e);
+                          }}
+                          {...(isEdit
+                            ? {
+                                open: scheduleOpen,
+                                onOpen: () => setScheduleOpen(true),
+                                onClose: () => setScheduleOpen(false)
+                              }
+                            : {})}
+                          size="small"
+                          fullWidth
+                          sx={{
+                            height: 135,
+                            borderRadius: 1,
+                            '& .MuiSelect-select': { minHeight: 40, display: 'flex', alignItems: 'center', padding: '8px 12px', overflow: 'hidden' }
+                          }}
+                          MenuProps={{
+                            PaperProps: {
+                              sx: {
+                                maxHeight: 300,
+                                display: 'block'
+                              }
+                            },
+                            MenuListProps: {
+                              sx: {
+                                maxHeight: 260,
+                                overflowY: 'auto'
+                              }
+                            }
+                          }}
+                        >
+                          {scheduleData && scheduleData.length > 0 ? (
+                            scheduleData.map((item) => {
+                              const isChecked = selectedSchedule.some(
+                                (s) => s && s.ScheduleRef === item.ScheduleRef
+                              );
                               return (
                                 <MenuItem key={item.ScheduleRef} value={item}>
+                                  <Checkbox checked={isChecked} size="small" sx={{ mr: 1 }} />
                                   {item.Title}
                                 </MenuItem>
                               );
-                            }
-                            return null;
-                          })
-                        ) : (
-                          <MenuItem>No Items available</MenuItem>
-                        )}
-                      </Select>
+                            })
+                          ) : (
+                            <MenuItem>No Items available</MenuItem>
+                          )}
+
+                          {isEdit && (
+                            <MenuItem
+                              component="div"
+                              disableRipple
+                              sx={{
+                                position: 'sticky',
+                                bottom: 0,
+                                zIndex: 1,
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                px: 1,
+                                py: 0.5,
+                                bgcolor: 'transparent'
+                              }}
+                            >
+                              <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: 'background.paper', borderRadius: 1, p: '4px' }}>
+                                <Button
+                                  type="button"
+                                  size="small"
+                                  variant="contained"
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    ev.preventDefault();
+                                    setScheduleOpen(false);
+                                  }}
+                                >
+                                  Done
+                                </Button>
+                              </Box>
+                            </MenuItem>
+                          )}
+                        </Select>
+                      )}
                     </Box>
 
                     <Box sx={{ width: controlWidth, display: 'flex', gap: 2 }}>
@@ -597,7 +766,7 @@ const SaveMonitorDetails = (props) => {
                           onChange={(e) => setOrientation(e.target.value)}
                           size="small"
                           fullWidth
-                          sx={{ '& .MuiSelect-select': { minHeight: 40 } }}
+                          sx={{ '& .MuiSelect-select': { minHeight: 20 } }}
                         >
                           {orientations.map((value) => (
                             <MenuItem key={value} value={value}>

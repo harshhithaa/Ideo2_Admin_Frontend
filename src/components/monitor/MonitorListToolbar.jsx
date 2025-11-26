@@ -147,7 +147,7 @@ const MonitorListToolbar = (props) => {
                 size="small"
                 renderValue={(value) => {
                   if (!value) {
-                    return <span style={{ color: 'rgba(0,0,0,0.6)', fontSize: '0.95rem' }}>Select Default Playlist</span>;
+                    return <span style={{ color: 'rgba(0,0,0,0.6)', fontSize: '0.95rem' }}>SELECT DEFAULT PLAYLIST</span>;
                   }
                   return selectedPlaylistName;
                 }}
