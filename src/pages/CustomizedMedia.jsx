@@ -89,7 +89,7 @@ const CustomizedMedia = () => {
         </Typography>
 
         <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
-          Select one of the preset backgrounds below or upload an image from your PC to start creating.
+          Select one of the preset backgrounds below or open editor to start creating.
         </Typography>
 
         <Card sx={{ p: 2, mb: 3 }}>

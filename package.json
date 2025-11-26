@@ -73,6 +73,7 @@
     "short-uuid": "^4.2.2",
     "styled-components": "^6.1.8",
     "swiper": "^11.1.0",
+    "tui-image-editor": "^3.15.3",
     "uuid": "^10.0.0",
     "yup": "^1.4.0"
   },
