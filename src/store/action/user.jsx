@@ -591,3 +591,62 @@ export const updateAllMonitors = (data, callback) => (dispatch) => {
       console.log(err);
     });
 };
+
+export const getMonitorStatus = (adminRef, callback) => (dispatch) => {
+  const token = store.getState().root.user.accesstoken;
+  try {
+    return Api.get('/monitor/fetchadminmonitorsstatus', {
+      params: { AdminRef: adminRef },
+      headers: {
+        AuthToken: token
+      }
+    })
+      .then((res) => {
+        console.log('getMonitorStatus raw response:', res.data);
+        
+        if (!res.data.Error) {
+          // Handle both array and nested array responses
+          let statusData = res.data.Details;
+          
+          // If Details is array of arrays, flatten it
+          if (Array.isArray(statusData) && statusData.length > 0 && Array.isArray(statusData[0])) {
+            statusData = statusData[0];
+          }
+          
+          console.log('Monitor Status Data (processed):', statusData);
+          
+          if (typeof callback === 'function') {
+            callback({ exists: false, data: statusData });
+          }
+          return statusData;
+        }
+
+        // error handling
+        if (res.data.Error && res.data.Error.ErrorCode === ErrorCode.Invalid_User_Credentials) {
+          dispatch({
+            type: STOREUSER,
+            payload: {
+              valid: false,
+              accesstoken: null
+            }
+          });
+        }
+        if (typeof callback === 'function') {
+          callback({ exists: true, errmessage: res.data.Error?.ErrorMessage });
+        }
+        return Promise.reject(res.data.Error);
+      })
+      .catch((err) => {
+        console.error('getMonitorStatus error:', err);
+        if (typeof callback === 'function') {
+          callback({ exists: true, err: err });
+        }
+        throw err;
+      });
+  } catch (err) {
+    if (typeof callback === 'function') {
+      callback({ exists: true, err });
+    }
+    return Promise.reject(err);
+  }
+};
