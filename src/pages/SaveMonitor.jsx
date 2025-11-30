@@ -63,10 +63,13 @@ const SaveMonitorDetails = (props) => {
   const [updatedSchedules, setUpdatedSchedules] = useState([]);
   const [loader, setloader] = useState(true);
   const [scheduleloader, setScheduleloader] = useState(true);
-  const [orientation, setOrientation] = useState(
-    (state && state.Orientation === '90' ? 'Landscape' : 'Portrait') || ''
-  );
-  const [slideTime, setSlideTime] = useState((state && state.SlideTime) || '');
+  const [orientation, setOrientation] = useState(() => {
+    // only derive a default when the location state actually contains Orientation
+    if (state && typeof state.Orientation !== 'undefined' && state.Orientation !== null) {
+      return state.Orientation === '90' ? 'Landscape' : 'Portrait';
+    }
+    return ''; // no default so user can choose
+  });
   const [type, settype] = useState(
     state && state.type === 'View'
       ? 'View'
@@ -90,9 +93,10 @@ const SaveMonitorDetails = (props) => {
   
   var clashingSchedules = [];
 
-  const min = 5;
-  const max = 60;
-  const step = 5;
+  // slide interval removed per request
+  // const min = 5;
+  // const max = 60;
+  // const step = 5;
 
   // consistent control width for all form inputs
   const controlWidth = { xs: '100%', sm: '720px' };
@@ -166,8 +170,8 @@ const SaveMonitorDetails = (props) => {
       DefaultPlaylistRef: selectedPlaylist,
       Schedules: [...selectedSchedules, ...deletedSchedules],
       IsActive: 1,
-      Orientation: orientation === 'Landscape' ? '90' : '0',
-      SlideTime: slideTime
+      Orientation: orientation === 'Landscape' ? '90' : '0'
+      // SlideTime removed
     };
     if (MonitorRef !== '') saveMonitorDetails.MonitorRef = MonitorRef;
 
@@ -568,6 +572,51 @@ const SaveMonitorDetails = (props) => {
                       )}
                     </Box>
 
+                    {/* Orientation moved above Schedule */}
+                    <Box sx={{ width: controlWidth }}>
+                      <InputLabel id="select-orientation" sx={{ fontWeight: 600, mb: 1 }}>
+                        Select Orientation
+                      </InputLabel>
+                      {state && state.type === 'View' ? (
+                        <Box
+                          sx={{
+                            height: 40,
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            px: 2,
+                            py: 1,
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {orientation || 'Not set'}
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <Select
+                          labelId="select-orientation"
+                          id="select-orientation"
+                          value={orientation}
+                          label="orientation"
+                          onChange={(e) => setOrientation(e.target.value)}
+                          size="small"
+                          fullWidth
+                          sx={{ '& .MuiSelect-select': { minHeight: 40, padding: '8px 12px' } }}
+                        >
+                          {orientations.map((value) => (
+                            <MenuItem key={value} value={value}>
+                              {value}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      )}
+                    </Box>
+
+                    {/* Schedule remains at the bottom and aligned with other controls */}
                     <Box sx={{ width: controlWidth }}>
                       <InputLabel id="select-schedule" sx={{ fontWeight: 600, mb: 1 }}>
                         Schedule
@@ -753,54 +802,6 @@ const SaveMonitorDetails = (props) => {
                       )}
                     </Box>
 
-                    <Box sx={{ width: controlWidth, display: 'flex', gap: 2 }}>
-                      <Box sx={{ flex: 1 }}>
-                        <InputLabel id="select-orientation" sx={{ fontWeight: 600, mb: 1 }}>
-                          Select Orientation
-                        </InputLabel>
-                        <Select
-                          labelId="select-orientation"
-                          id="select-orientation"
-                          value={orientation}
-                          label="orientation"
-                          onChange={(e) => setOrientation(e.target.value)}
-                          size="small"
-                          fullWidth
-                          sx={{ '& .MuiSelect-select': { minHeight: 20 } }}
-                        >
-                          {orientations.map((value) => (
-                            <MenuItem key={value} value={value}>
-                              {value}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </Box>
-
-                      <Box sx={{ flex: 1 }}>
-                        <InputLabel id="select-slide-interval" sx={{ fontWeight: 600, mb: 1 }}>
-                          Slide Interval (seconds)
-                        </InputLabel>
-                        <TextField
-                          type="number"
-                          id="select-slide-interval"
-                          value={slideTime}
-                          inputProps={{ min, max, step }}
-                          onChange={(e) => setSlideTime(e.target.value)}
-                          size="small"
-                          fullWidth
-                          variant="outlined"
-                        />
-                      </Box>
-                    </Box>
-                    
-                    {/* end controls */}
-
-                    {box ? (
-                      <Stack sx={{ width: '100%' }} spacing={2}>
-                        <Alert severity={color}>{boxMessage}</Alert>
-                      </Stack>
-                    ) : null}
-
                     <Box sx={{ py: 2 }}>
                       <Button
                         color="primary"
@@ -810,7 +811,7 @@ const SaveMonitorDetails = (props) => {
                         onClick={() => {
                           handleDateAndTime();
                         }}
-                        disabled={slideTime < 5 || slideTime > 60}
+                        /* slide interval removed: always enabled (can add validation later) */
                       >
                         {type} Monitor
                       </Button>

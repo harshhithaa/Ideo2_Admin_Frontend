@@ -12,7 +12,7 @@ const placeholderStyle = {
   height: '100%'
 };
 
-const MediaGrid = ({ media = [], setselected, selected = [] }) => {
+const MediaGrid = ({ media = [], setselected, selected = [], columns = 6 }) => {
   const [selectedMediaRef, setSelectedMediaRef] = useState(Array.isArray(selected) ? selected : []);
 
   useEffect(() => {
@@ -139,22 +139,24 @@ const MediaGrid = ({ media = [], setselected, selected = [] }) => {
         <Box
           sx={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
             gap: 2,
             width: '100%'
           }}
         >
-          {media.map((it) => renderTile(it))}
-        </Box>
-      )}
-    </Box>
-  );
+           {media.map((it) => renderTile(it))}
+         </Box>
+       )}
+     </Box>
+   );
 };
 
 MediaGrid.propTypes = {
-  media: PropTypes.array,
-  setselected: PropTypes.func.isRequired,
-  selected: PropTypes.array
-};
+   media: PropTypes.array,
+   setselected: PropTypes.func.isRequired,
+   selected: PropTypes.array
+  , columns: PropTypes.number
+ };
 
-export default MediaGrid;
+ export default MediaGrid;
+ 

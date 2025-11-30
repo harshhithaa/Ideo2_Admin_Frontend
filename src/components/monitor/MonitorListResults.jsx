@@ -76,9 +76,11 @@ const MonitorListResults = (props) => {
 
   return (
     <Card sx={{ boxShadow: 2 }}>
-      <PerfectScrollbar>
-        <Box sx={{ minWidth: 1050 }}>
-          <Table>
+      {/* constrain the table area so the page doesn't scroll;
+          PerfectScrollbar will handle the inner scrolling area */}
+      <PerfectScrollbar style={{ maxHeight: '60vh' }}>
+        <Box sx={{ width: '100%', overflowY: 'auto', overflowX: 'hidden' }}>
+          <Table stickyHeader sx={{ tableLayout: 'fixed', '& th, & td': { fontSize: '0.95rem' } }}>
             <TableHead>
               <TableRow
                 sx={{
@@ -86,7 +88,7 @@ const MonitorListResults = (props) => {
                   borderBottom: '2px solid #ddd'
                 }}
               >
-                <TableCell padding="checkbox" align="center" sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, width: '5%' }}>
+                <TableCell padding="checkbox" align="center" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, width: '5%' }}>
                   <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                     <Checkbox
                       checked={allchecked}
@@ -101,19 +103,19 @@ const MonitorListResults = (props) => {
                   </Box>
                 </TableCell>
 
-                <TableCell align="left" sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '20%' }}>
+                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '20%' }}>
                   Monitor Name
                 </TableCell>
 
-                <TableCell align="left" sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '45%' }}>
+                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '45%' }}>
                   Description
                 </TableCell>
 
-                <TableCell align="left" sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '20%' }}>
+                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '20%' }}>
                   Default Playlist
                 </TableCell>
 
-                <TableCell align="center" sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '10%' }}>
+                <TableCell align="center" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '10%' }}>
                   Edit
                 </TableCell>
               </TableRow>
@@ -157,14 +159,16 @@ const MonitorListResults = (props) => {
 
                       <TableCell align="left" onClick={() => props.view && props.view(monitor)} sx={{ padding: '16px', cursor: 'pointer', fontWeight: 500, color: '#1976d2', width: '20%', '&:hover': { textDecoration: 'underline' } }}>
                         <Box sx={{ alignItems: 'center', display: 'flex' }}>
-                          <Typography color="textPrimary" variant="body2">
+                          <Typography color="textPrimary" variant="body2" noWrap sx={{ fontSize: '0.95rem' }}>
                             {monitor.MonitorName}
                           </Typography>
                         </Box>
                       </TableCell>
 
                       <TableCell align="left" onClick={() => props.view && props.view(monitor)} sx={{ padding: '16px', cursor: 'pointer', color: '#666', fontSize: '0.9rem', width: '45%', '&:hover': { backgroundColor: '#fafafa' } }}>
-                        {monitor.Description === 'null' || !monitor.Description ? '--' : monitor.Description}
+                        <Typography noWrap sx={{ fontSize: '0.95rem', color: '#666' }}>
+                          {monitor.Description === 'null' || !monitor.Description ? '--' : monitor.Description}
+                        </Typography>
                       </TableCell>
 
                       <TableCell align="left" onClick={() => props.view && props.view(monitor)} sx={{ padding: '16px', cursor: 'pointer', color: '#666', fontSize: '0.9rem', width: '20%', '&:hover': { backgroundColor: '#fafafa' } }}>

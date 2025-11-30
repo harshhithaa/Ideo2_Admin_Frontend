@@ -56,7 +56,7 @@ const CreatePlaylist = (props) => {
 
   // pagination / tab (image / video) like Media page
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(12);
+  const [pageSize, setPageSize] = useState(12); // match Media page: 12 items per batch
   const [totalRecords, setTotalRecords] = useState(0);
   const [loading, setLoading] = useState(false);
   const [mediaTypeFilter, setMediaTypeFilter] = useState('image'); // images by default
@@ -305,20 +305,19 @@ const CreatePlaylist = (props) => {
       <Box
         sx={{
           backgroundColor: 'background.default',
-          height: '100vh',
+          minHeight: '100vh',      // allow page to grow beyond viewport
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden'
+          overflow: 'auto'         // permit page scroll so footer/pagination isn't clipped
         }}
       >
         <Container
           maxWidth="lg"
           sx={{
-            height: '100%',
             display: 'flex',
             flexDirection: 'column',
             py: 2,
-            overflow: 'visible' // allow the footer button (moved below) to be visible
+            overflow: 'visible'
           }}
         >
           <Formik initialValues={{ title, description }}>
@@ -414,12 +413,14 @@ const CreatePlaylist = (props) => {
                     borderRadius: `${panelRadius}px`,
                     backgroundColor: panelBg,
                     p: 1,
-                    position: 'relative',            // allow absolutely positioned button inside panel
+                    position: 'relative',
                     border: `1px solid ${panelBorder}`,
                     mt: 0,
-                    overflow: 'visible',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    // limit panel overall height and allow the inner grid to scroll
+                    maxHeight: '60vh',
                     boxSizing: 'border-box',
-                    /* allow the panel to size within the page so footer stays visible */
                     minHeight: 'auto'
                   }}>
                     {/* Tabs for Images / Videos like Media page */}
@@ -440,11 +441,14 @@ const CreatePlaylist = (props) => {
                       />
                     </Box>
 
-                    {/* Reuse MediaGrid (same component used on Media page) */}
-                    <MediaGrid media={media} setselected={onGridSelectionChange} selected={selectedRefs} />
+                    {/* Reuse MediaGrid (same component used on Media page).
+                        Inner scroller keeps pagination visible at the panel bottom. */}
+                    <Box sx={{ flex: 1, overflowY: 'auto', pr: 0.5 }}>
+                      <MediaGrid media={media} setselected={onGridSelectionChange} selected={selectedRefs} columns={6} />
+                    </Box>
 
-                    {/* simple footer pagination controls (you can swap for MUI/Pagination component) */}
-                    <Box sx={{ gridColumn: '1/-1', mt: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                    {/* simple footer pagination controls kept visible below the scrolling grid */}
+                    <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
                       <Button disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>Prev</Button>
                       <Typography variant="body2">Page {currentPage} — {totalRecords} items</Typography>
                       <Button disabled={(currentPage * pageSize) >= totalRecords} onClick={() => setCurrentPage((p) => p + 1)}>Next</Button>

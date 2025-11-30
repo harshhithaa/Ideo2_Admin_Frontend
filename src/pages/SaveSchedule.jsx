@@ -22,7 +22,8 @@ import {
   Typography,
   ToggleButton,
   ToggleButtonGroup,
-  useTheme
+  useTheme,
+  Paper
 } from '@mui/material';
 
 const SaveScheduleDetails = (props) => {
@@ -110,34 +111,27 @@ const SaveScheduleDetails = (props) => {
 
   // common label styling to make labels slightly larger and darker
   const labelSx = {
-    fontSize: '1.05rem',            // increased from 0.98rem
-    color: theme.palette.text.primary,
-    fontWeight: 700                 // made slightly darker/bolder
-  };
-
+    fontSize: '1.05rem',    color: theme.palette.text.primary,
+    fontWeight: 700  };
+  
+  // match Monitor UI: wrap form in a white Paper/card
+  // (keeps the existing form markup unchanged; only the outer wrapper is adjusted)
   return (
-    <Box
+    <Paper
+      elevation={2}
       sx={{
-        width: '100%',
-        px: { xs: 3, md: 6 }, // increase side padding to add white space
-        py: 4,
-        minHeight: '80vh',
-        boxSizing: 'border-box'
+        maxWidth: 900,          // increased width so left/right chips are fully visible
+        mx: 'auto',
+        mt: 6,
+        mb: 6,
+        p: { xs: 3, sm: 6 },    // increased padding for breathing room
+        borderRadius: 2
       }}
     >
-      {/* reduced maxWidth so inputs are shorter and leave white space on both sides */}
-      <Box sx={{ maxWidth: 1000, mx: 'auto', width: '100%' }}>
-        <Typography
-          variant="h4"
-          align="center"
-          gutterBottom
-          fontWeight={700}
-          fontSize={28}                    // slightly larger page header
-          sx={{ mb: { xs: 4, md: 6 } }} // extra spacing below header
-        >
-          Create Schedule
-        </Typography>
-
+      <Typography align="center" variant="h5" sx={{ fontWeight: 700, mb: 3 }}>
+        Create Schedule
+      </Typography>
+      <Box sx={{ maxWidth: 860, mx: 'auto', width: '100%' }}>
         <Box component="form" onSubmit={handleSubmit} noValidate>
           <Grid container spacing={3}>
             {/* Row 1 — Title & Description */}
@@ -339,7 +333,7 @@ const SaveScheduleDetails = (props) => {
           </Grid>
         </Box>
       </Box>
-    </Box>
+    </Paper>
   );
 };
 

@@ -126,10 +126,13 @@ const PlaylistListResults = (props) => {
 
   return (
     <Card sx={{ boxShadow: 2 }}>
-      <PerfectScrollbar>
-        <Box sx={{ minWidth: 1050 }}>
+      {/* constrain inner area so page stays static; inner area scrolls */}
+      <PerfectScrollbar style={{ maxHeight: '60vh' }}>
+        <Box sx={{ width: '100%', overflowY: 'auto', overflowX: 'hidden' }}>
           {showPreviewModal && <PreviewModal Media={Media} />}
-          <Table>
+
+          {/* Table: ensure proper opening and closing tags */}
+          <Table sx={{ tableLayout: 'fixed', '& th, & td': { fontSize: '0.95rem' } }}>
             <TableHead>
               <TableRow
                 sx={{
@@ -142,7 +145,6 @@ const PlaylistListResults = (props) => {
                   align="center"
                   sx={{
                     fontWeight: 700,
-                    fontSize: '0.95rem',
                     color: '#333',
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
@@ -322,7 +324,7 @@ const PlaylistListResults = (props) => {
                             }
                           }}
                         >
-                          <Typography color="textPrimary" variant="body2">
+                          <Typography color="textPrimary" variant="body2" noWrap sx={{ fontSize: '0.95rem' }}>
                             {Playlist.Name}
                           </Typography>
                         </TableCell>
@@ -341,7 +343,9 @@ const PlaylistListResults = (props) => {
                             }
                           }}
                         >
-                          {Playlist.Description === 'null' ? '--' : Playlist.Description}
+                          <Typography noWrap sx={{ fontSize: '0.95rem', color: '#666' }}>
+                            {Playlist.Description === 'null' ? '--' : Playlist.Description}
+                          </Typography>
                         </TableCell>
 
                         <TableCell
@@ -427,18 +431,16 @@ const PlaylistListResults = (props) => {
         </Box>
       </PerfectScrollbar>
 
+      {/* Pagination remains outside the scroller so it's always visible */}
       <TablePagination
         component="div"
-        count={playlists && playlists.length}
+        count={playlists ? playlists.length : 0}
         onPageChange={handlePageChange}
         onRowsPerPageChange={handleLimitChange}
         page={page}
         rowsPerPage={limit}
         rowsPerPageOptions={[5, 10, 25]}
-        sx={{
-          borderTop: '2px solid #eee',
-          backgroundColor: '#f9f9f9'
-        }}
+        sx={{ borderTop: '2px solid #eee', backgroundColor: '#f9f9f9' }}
       />
     </Card>
   );
