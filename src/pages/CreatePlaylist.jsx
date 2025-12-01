@@ -255,6 +255,14 @@ const CreatePlaylist = (props) => {
   }, [defaultDuration, durationMode]); // eslint-disable-line
 
   function savePlaylistDetails() {
+    // client-side required validation for playlist name
+    if (!title || title.toString().trim() === '') {
+      setcolor('error');
+      setboxMessage('Title is required');
+      setbox(true);
+      window.scrollTo(0, 0);
+      return;
+    }
     // before save: sanitize durations (set numeric defaults for images, null for videos)
     const sanitizedPlaylist = playlistMedia.map((p) => {
       const isVideo = isVideoRef(p.MediaRef);
@@ -504,7 +512,14 @@ const CreatePlaylist = (props) => {
  
                 {/* existing primary action kept here — fully outside the media panel, non-overlapping */}
                 <Box sx={{ mt: 0.5, mb: 8.5, display: 'flex', justifyContent: 'center' }}>
-                  <Button color="primary" size="large" type="button" variant="contained" onClick={() => savePlaylistDetails()}>
+                  <Button
+                    color="primary"
+                    size="large"
+                    type="button"
+                    variant="contained"
+                    onClick={() => savePlaylistDetails()}
+                    disabled={!title || title.toString().trim() === ''}
+                  >
                     {type} Playlist
                   </Button>
                 </Box>
