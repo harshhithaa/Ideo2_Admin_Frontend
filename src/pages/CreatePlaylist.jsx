@@ -34,12 +34,17 @@ const CreatePlaylist = (props) => {
   const [media, setMedia] = useState([]);
   const [id] = useState((state && state.PlaylistRef) || '');
 
-  const [loader, setloader] = useState(false);
-  const [mediaData, setMediaData] = useState([]);
+  // Add: initial playlist media state for edit/view
   const [playlistMedia, setplaylistMedia] = useState([]);
   const [deletedplaylistMedia, setdeletedplaylistMedia] = useState([]);
-  const [selectionCounter, setSelectionCounter] = useState(1); // unique incremental id for each selection
+  const [selectedRefs, setSelectedRefs] = useState([]);
+  const [selectionCounter, setSelectionCounter] = useState(1);
 
+  const [loader, setloader] = useState(false);
+  const [mediaData, setMediaData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [mediaTypeFilter, setMediaTypeFilter] = useState('image'); // images by default
+  const [searchQuery, setSearchQuery] = useState('');
   const [box, setbox] = useState(false);
   const [boxMessage, setboxMessage] = useState('');
   const [color, setcolor] = useState('success');
@@ -58,10 +63,6 @@ const CreatePlaylist = (props) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12); // match Media page: 12 items per batch
   const [totalRecords, setTotalRecords] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [mediaTypeFilter, setMediaTypeFilter] = useState('image'); // images by default
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRefs, setSelectedRefs] = useState([]); // keep simple array for MediaGrid
 
   // fetch paginated media (re-uses server paginated endpoint used by media page)
   const fetchMedia = (page = currentPage, size = pageSize, mediaType = mediaTypeFilter, search = searchQuery) => {
@@ -297,6 +298,35 @@ const CreatePlaylist = (props) => {
       }
     });
   }
+
+  // Pre-populate playlist media selections on Edit/View
+  useEffect(() => {
+    if ((type === 'Edit' || type === 'View') && state && state.Media && state.Media.length > 0) {
+      // Map playlist media to selection objects
+      const initialSelections = state.Media.map((m, idx) => ({
+        MediaRef: m.MediaRef,
+        IsActive: m.IsActive !== undefined ? m.IsActive : 1,
+        SelectionId: idx + 1,
+        Duration: m.Duration !== undefined ? m.Duration : (m.MediaType && m.MediaType.toLowerCase().includes('video') ? null : 10)
+      }));
+      setplaylistMedia(initialSelections.filter(sel => sel.IsActive === 1));
+      setdeletedplaylistMedia(initialSelections.filter(sel => sel.IsActive === 0));
+      setSelectedRefs(initialSelections.filter(sel => sel.IsActive === 1).map(sel => sel.MediaRef));
+      setSelectionCounter(initialSelections.length + 1);
+    }
+  // Only run on mount or when state changes
+  }, [type, state]);
+
+  // Do NOT reset selectedRefs when switching tabs if editing
+  useEffect(() => {
+    if (type === 'Create') {
+      setSelectedRefs([]);
+      setplaylistMedia([]);
+      setdeletedplaylistMedia([]);
+      setSelectionCounter(1);
+    }
+    // For Edit/View, keep selections
+  }, [mediaTypeFilter, type]);
 
   return (
     <>
