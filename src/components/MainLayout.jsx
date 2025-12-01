@@ -26,7 +26,7 @@ const MainLayoutContainer = styled('div')({
 const MainLayoutContent = styled('div')({
   flex: '1 1 auto',
   height: '100%',
-  overflow: 'hidden'  // page-level scrolling disabled; internal panels scroll instead
+  overflow: 'hidden'
 });
 
 const MainLayout = () => (

@@ -33,6 +33,7 @@ const ScheduleList = (props) => {
   const [color, setcolor] = useState('success');
 
   let navigate = useNavigate();
+  
   useEffect(() => {
     const data = {
       componenttype: COMPONENTS.Schedule
@@ -46,6 +47,7 @@ const ScheduleList = (props) => {
       }
     });
   }, [loader]);
+
   const style = {
     position: 'absolute',
     top: '50%',
@@ -84,16 +86,33 @@ const ScheduleList = (props) => {
               setbox(true);
               console.log(err.errmessage);
             } else {
+              // Immediately remove deleted items from UI
+              setSchedules((prevSchedules) => {
+                return prevSchedules.filter((schedule) => {
+                  const scheduleId = schedule.Id || schedule.id || schedule.ScheduleId;
+                  return !selected.includes(scheduleId);
+                });
+              });
+
+              // Clear selection after deletion
+              setselected([]);
+
+              // Show success message
               setcolor('success');
               setboxMessage('Schedule Deleted Successfully!');
               setbox(true);
-              setLoader(false);
+
+              // Auto-hide success message after 3 seconds
+              setTimeout(() => {
+                setbox(false);
+              }, 3000);
             }
           });
         }
       }
     });
   };
+
   return (
     <>
       <Helmet>
@@ -107,7 +126,7 @@ const ScheduleList = (props) => {
       <Box
         sx={{
           backgroundColor: 'background.default',
-          height: '100%',                 // fill available layout height
+          height: '100%',
           display: 'flex',
           flexDirection: 'column',
           py: 3,
@@ -178,7 +197,6 @@ const ScheduleList = (props) => {
             selectedSchedules={selected}
           />
 
-          {/* results area — internal scroll only */}
           <Box sx={{ pt: 3, flex: '1 1 auto', minHeight: 0, overflow: 'auto' }}>
             <ScheduleListResults
               Schedules={scheduleItem}
@@ -197,12 +215,14 @@ const ScheduleList = (props) => {
      </>
    );
  };
+
 const mapStateToProps = ({ root = {} }) => {
   const schedule = root.user.components;
   return {
     schedule
   };
-};
+ };
+
 const mapDispatchToProps = (dispatch) => ({
   getUserComponentList: (data, callback) =>
     dispatch(getUserComponentList(data, callback)),
