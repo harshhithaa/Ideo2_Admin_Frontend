@@ -18,7 +18,8 @@ import {
   Typography,
   Tabs,
   Tab,
-  SvgIcon
+  SvgIcon,
+  Tooltip
 } from '@mui/material';
 import { Search as SearchIcon, Trash2 as Trash2Icon } from 'react-feather';
 import { connect } from 'react-redux';
@@ -258,12 +259,31 @@ const MediaList = (props) => {
 
   const handlePageChange = (event, value) => { setCurrentPage(value); fetchMediaList(value, pageSize, searchQuery, mediaTypeFilter); };
 
+  // helper to know whether delete button should be enabled
+  const hasSelection = Array.isArray(selected) && selected.length > 0;
+
+  // visible items on current page/grid
+  const visibleRefs = Array.isArray(mediaItem) ? mediaItem.map((it) => it.MediaRef) : [];
+  const allVisibleSelected = visibleRefs.length > 0 && visibleRefs.every((r) => selected.includes(r));
+  const someVisibleSelected = visibleRefs.some((r) => selected.includes(r)) && !allVisibleSelected;
+
+  const handleSelectAllVisible = () => {
+    if (visibleRefs.length === 0) return;
+    if (allVisibleSelected) {
+      // unselect all visible
+      setselected((prev) => prev.filter((r) => !visibleRefs.includes(r)));
+    } else {
+      // add all visible to selection (avoid duplicates)
+      setselected((prev) => Array.from(new Set([...(prev || []), ...visibleRefs])));
+    }
+  };
+
   return (
     <>
       <Helmet><title>Media | Ideogram</title></Helmet>
 
       {box && (
-        <Stack sx={{ position: 'fixed', top: 80, right: 16, zIndex: 9999, width: 'auto', maxWidth: 400 }} spacing={2}>
+        <Stack sx={{ position: 'fixed', top: 10, left: 870, zIndex: 9999, width: 'auto', maxWidth: 400 }} spacing={2}>
           <Alert severity={color} onClose={() => setbox(false)}>{boxMessage}</Alert>
         </Stack>
       )}
@@ -317,6 +337,59 @@ const MediaList = (props) => {
 
                 {/* Action Buttons */}
                 <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  {/* Delete button - identical styling/behavior to ScheduleList delete button */}
+                  {!hasSelection ? (
+                    <Tooltip title="Select media(s) to delete" arrow>
+                      <span>
+                        <Button
+                          sx={{
+                            mx: 1,
+                            cursor: 'pointer',
+                            color: 'black',
+                            borderColor: 'error.main',
+                            '&:hover': { backgroundColor: 'rgba(211,47,47,0.08)' },
+                            '& .MuiSvgIcon-root': { color: 'error.main' }
+                          }}
+                          onClick={() => setModal(true)}
+                          disabled={selected.length === 0}
+                          variant="outlined"
+                          color="error"
+                          startIcon={
+                            <SvgIcon fontSize="small">
+                              <Trash2Icon />
+                            </SvgIcon>
+                          }
+                          aria-label="Delete selected media"
+                        >
+                          Delete
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  ) : (
+                    <Button
+                      sx={{
+                        mx: 1,
+                        cursor: 'pointer',
+                        color: 'black',
+                        borderColor: 'error.main',
+                        '&:hover': { backgroundColor: 'rgba(211,47,47,0.08)' },
+                        '& .MuiSvgIcon-root': { color: 'error.main' }
+                      }}
+                      onClick={() => setModal(true)}
+                      disabled={selected.length === 0}
+                      variant="outlined"
+                      color="error"
+                      startIcon={
+                        <SvgIcon fontSize="small">
+                          <Trash2Icon />
+                        </SvgIcon>
+                      }
+                      aria-label="Delete selected media"
+                    >
+                      Delete
+                    </Button>
+                  )}
+
                   <Button variant="contained" onClick={() => navigate('/app/savemedia')}
                     sx={{ textTransform: 'none', bgcolor: '#5b67d6', fontWeight: 500, px: 3, borderRadius: '6px', boxShadow: 'none', '&:hover': { bgcolor: '#4c5bc6', boxShadow: 'none' } }}>
                     ADD MEDIA
@@ -339,85 +412,84 @@ const MediaList = (props) => {
           {/* Tabs + Grid */}
           <Box sx={{ display: 'flex', justifyContent: 'center' }}>
             <Box sx={{ width: '100%', maxWidth: 1400, bgcolor: 'transparent', borderRadius: '8px', boxShadow: 'none', overflow: 'hidden' }}>
-              <Box sx={{ borderBottom: 'none', px: 2, pt: 1, display: 'flex', justifyContent: 'center', bgcolor: 'transparent' }}>
-                <Tabs
-                  value={activeTab}
-                  onChange={handleTabChange}
-                  TabIndicatorProps={{ children: <span className="MuiTabs-indicatorSpan" /> }}
-                  sx={{
-                    minHeight: 48,
-                    position: 'relative',
-                    '& .MuiTabs-flexContainer': { gap: 1, alignItems: 'center' },
+              <Box sx={{ borderBottom: 'none', px: 2, pt: 3, display: 'flex', justifyContent: 'center', bgcolor: 'transparent' }}>
+                <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%' }}>
+                  {/* Tabs kept centered (unchanged visuals) */}
+                  <Box sx={{ margin: '0 auto' }}>
+                    <Tabs
+                      value={activeTab}
+                      onChange={handleTabChange}
+                      TabIndicatorProps={{ children: <span className="MuiTabs-indicatorSpan" /> }}
+                      sx={{
+                        minHeight: 48,
+                        position: 'relative',
+                        '& .MuiTabs-flexContainer': { gap: 1, alignItems: 'center' },
+                        '& .MuiButtonBase-root, & .MuiTab-root': {
+                          bgcolor: 'transparent !important',
+                          boxShadow: 'none !important',
+                        },
+                        '& .MuiButtonBase-root.Mui-focusVisible': { bgcolor: 'transparent !important' },
+                        '& .MuiTab-root:focus': { outline: 'none', bgcolor: 'transparent !important' },
+                        '& .MuiTab-root': {
+                          height: 36,
+                          padding: '0 18px',
+                          borderRadius: '999px',
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          fontSize: '14px',
+                          color: '#6b7280',
+                          transition: 'color 200ms ease',
+                          zIndex: 3,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        },
+                        '& .MuiTab-root .MuiTab-wrapper': { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+                        '& .MuiTab-root.Mui-selected': { bgcolor: 'transparent !important', color: '#1976d2', zIndex: 3 },
+                        '& .MuiTabs-indicator': {
+                          position: 'absolute',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          height: 36,
+                          transition: 'left 300ms cubic-bezier(0.4,0,0.2,1), width 300ms cubic-bezier(0.4,0,0.2,1)',
+                          borderRadius: '999px',
+                          zIndex: 2,
+                          backgroundColor: 'transparent',
+                          pointerEvents: 'none'
+                        },
+                        '& .MuiTabs-indicatorSpan': {
+                          display: 'block',
+                          width: '100%',
+                          height: '100%',
+                          backgroundColor: '#e3f2fd',
+                          borderRadius: '999px',
+                          boxShadow: 'none'
+                        }
+                      }}
+                    >
+                      <Tab disableRipple label="IMAGES" value="IMAGES" />
+                      <Tab disableRipple label="VIDEOS" value="VIDEOS" />
+                    </Tabs>
+                  </Box>
 
-                    // ensure no extra background on tab buttons — only the animated indicator pill is visible
-                    '& .MuiButtonBase-root, & .MuiTab-root': {
-                      bgcolor: 'transparent !important',
-                      boxShadow: 'none !important',
-                    },
-                    // remove focus / ripple backgrounds that appear on click
-                    '& .MuiButtonBase-root.Mui-focusVisible': {
-                      bgcolor: 'transparent !important',
-                    },
-                    '& .MuiTab-root:focus': {
-                      outline: 'none',
-                      bgcolor: 'transparent !important'
-                    },
-
-                    '& .MuiTab-root': {
-                      height: 36,
-                      padding: '0 18px',
-                      borderRadius: '999px',
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      fontSize: '14px',
-                      color: '#6b7280',
-                      transition: 'color 200ms ease',
-                      zIndex: 3,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    },
-
-                    '& .MuiTab-root .MuiTab-wrapper': {
-                      height: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    },
-
-                    '& .MuiTab-root.Mui-selected': {
-                      bgcolor: 'transparent !important',
-                      color: '#1976d2',
-                      zIndex: 3
-                    },
-
-                    // animated pill indicator (position & size animate) — placed behind text, vertically centered
-                    '& .MuiTabs-indicator': {
-                      position: 'absolute',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      height: 36,
-                      transition: 'left 300ms cubic-bezier(0.4,0,0.2,1), width 300ms cubic-bezier(0.4,0,0.2,1)',
-                      borderRadius: '999px',
-                      zIndex: 2,
-                      backgroundColor: 'transparent',
-                      pointerEvents: 'none'
-                    },
-                    '& .MuiTabs-indicatorSpan': {
-                      display: 'block',
-                      width: '100%',
-                      height: '100%',
-                      backgroundColor: '#e3f2fd',
-                      borderRadius: '999px',
-                      boxShadow: 'none'
-                    }
-                  }}
-                >
-                  <Tab disableRipple label="IMAGES" value="IMAGES" />
-                  <Tab disableRipple label="VIDEOS" value="VIDEOS" />
-                  <Tab disableRipple label="GIFs" value="GIFs" />
-                </Tabs>
-              </Box>
+                  {/* Select all - extreme right of tabs bar, unchanged placement */}
+                  <Box sx={{ position: 'absolute', right: 8, display: 'flex', alignItems: 'center' }}>
+                    {hasSelection && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', mr: 1 }}>
+                        <Checkbox
+                          size="small"
+                          checked={allVisibleSelected}
+                          indeterminate={someVisibleSelected}
+                          onChange={handleSelectAllVisible}
+                          inputProps={{ 'aria-label': 'Select all visible media' }}
+                          sx={{ p: 0, mr: 0.5 }}
+                        />
+                        <Typography variant="body2" sx={{ userSelect: 'none' }}>Select all</Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </Box>
+               </Box>
 
               <Box sx={{ p: 3, maxHeight: 'calc(100vh - 280px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', bgcolor: '#fff', borderRadius: '0 0 8px 8px' }}>
                 {!mediaItem || mediaItem.length === 0 ? (
