@@ -24,7 +24,7 @@ const CreatePlaylist = (props) => {
     state && state.type === 'View'
       ? 'View'
       : state && state.type === 'Edit'
-      ? 'Edit'   // show "Edit Playlist" instead of "Update Playlist"
+      ? 'Edit'
       : 'Create'
   );
 
@@ -34,38 +34,37 @@ const CreatePlaylist = (props) => {
   const [media, setMedia] = useState([]);
   const [id] = useState((state && state.PlaylistRef) || '');
 
-  // Add: initial playlist media state for edit/view
+  // FIXED: Store complete media objects with all metadata
   const [playlistMedia, setplaylistMedia] = useState([]);
   const [deletedplaylistMedia, setdeletedplaylistMedia] = useState([]);
   const [selectedRefs, setSelectedRefs] = useState([]);
   const [selectionCounter, setSelectionCounter] = useState(1);
 
+  // FIXED: Global media metadata store - never reset this
+  const [globalMediaMetadata, setGlobalMediaMetadata] = useState({});
+
   const [loader, setloader] = useState(false);
   const [mediaData, setMediaData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [mediaTypeFilter, setMediaTypeFilter] = useState('image'); // images by default
+  const [mediaTypeFilter, setMediaTypeFilter] = useState('image');
   const [searchQuery, setSearchQuery] = useState('');
   const [box, setbox] = useState(false);
   const [boxMessage, setboxMessage] = useState('');
   const [color, setcolor] = useState('success');
   const [durationError, setDurationError] = useState(false);
 
-  // Duration controls
-  const [durationMode, setDurationMode] = useState('Default'); // 'Default' | 'Custom'
-  const [defaultDuration, setDefaultDuration] = useState(10); // 10..60 (removed 5)
+  const [durationMode, setDurationMode] = useState('Default');
+  const [defaultDuration, setDefaultDuration] = useState(10);
 
-  // visual constants matched to Media page
   const panelBg = 'rgba(25,118,210,0.03)';
   const panelRadius = 8;
   const panelBorder = 'rgba(0,0,0,0.02)';
   const cardBorder = 'rgba(0,0,0,0.06)';
 
-  // pagination / tab (image / video) like Media page
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(12); // match Media page: 12 items per batch
+  const [pageSize, setPageSize] = useState(12);
   const [totalRecords, setTotalRecords] = useState(0);
 
-  // fetch paginated media (re-uses server paginated endpoint used by media page)
   const fetchMedia = (page = currentPage, size = pageSize, mediaType = mediaTypeFilter, search = searchQuery) => {
     setLoading(true);
     const requestData = {
@@ -87,48 +86,67 @@ const CreatePlaylist = (props) => {
         return;
       }
       const list = (res.data && res.data.ComponentList) || [];
-      // try to get total records from first row if SP returned it per-row
       const total = (list.length && list[0].TotalRecords) ? Number(list[0].TotalRecords) : (res.data && res.data.TotalRecords) || 0;
       setMedia(list);
       setMediaData(list);
       setTotalRecords(total);
-      // keep playlistMedia unchanged - no preselection
+
+      // FIXED: Update global metadata store with new media
+      const newMetadata = {};
+      list.forEach((item) => {
+        if (item.MediaRef) {
+          newMetadata[item.MediaRef] = extractMediaMetadata(item);
+        }
+      });
+      setGlobalMediaMetadata((prev) => ({ ...prev, ...newMetadata }));
     });
   };
 
-  // initial load & when filters change
+  // FIXED: Extract complete metadata from media item
+  const extractMediaMetadata = (item) => {
+    return {
+      MediaRef: item.MediaRef,
+      MediaName: item.MediaName || item.fileName || item.FileName || item.Name || item.name || item.Title || item.title || 'Unknown Media',
+      MediaPath: item.MediaPath || item.fileUrl || item.FileUrl || item.FileURL || item.url || '',
+      Thumbnail: item.Thumbnail || item.thumbnailUrl || item.ThumbnailUrl || item.posterFrame || item.MediaPath || item.fileUrl || '',
+      MediaType: item.MediaType || item.FileType || item.fileMimetype || item.FileMimetype || 'unknown',
+      FileMimetype: item.fileMimetype || item.FileMimetype || item.FileType || item.MediaType || '',
+      DurationSeconds: item.DurationSeconds || item.durationSeconds || item.Duration || null
+    };
+  };
+
   useEffect(() => {
     fetchMedia(1, pageSize, mediaTypeFilter, '');
     setCurrentPage(1);
-    // reset selections in the grid when changing tab
-    setSelectedRefs([]);
   }, [mediaTypeFilter]);
 
   useEffect(() => {
     fetchMedia(currentPage, pageSize, mediaTypeFilter, searchQuery);
   }, [currentPage, pageSize, searchQuery]);
 
-  // Helper: determine if a mediaRef corresponds to a video
   const isVideoRef = (mediaRef) => {
+    // Check global metadata first
+    if (globalMediaMetadata[mediaRef]) {
+      const mm = globalMediaMetadata[mediaRef].MediaType.toLowerCase();
+      if (mm.includes('video')) return true;
+      if (mm.includes('image')) return false;
+    }
+
+    // Fallback to current mediaData
     const item = mediaData.find((m) => m.MediaRef === mediaRef);
     if (!item) return false;
-    // check various common fields
     const mm = (item.fileMimetype || item.FileMimetype || item.FileType || item.MediaType || '').toString().toLowerCase();
     if (mm.includes('video')) return true;
     if (mm.includes('image')) return false;
-    // fallback: try extension in file url
     const url = (item.fileUrl || item.FileUrl || item.FileURL || '').toString().toLowerCase();
     if (url.match(/\.(mp4|mov|webm|mkv)$/)) return true;
     return false;
   };
 
-  // When MediaGrid selection changes (it returns array of MediaRef strings)
   const onGridSelectionChange = (newSelected) => {
-    // compute additions and removals relative to selectedRefs
     const added = newSelected.filter((r) => !selectedRefs.includes(r));
     const removed = selectedRefs.filter((r) => !newSelected.includes(r));
 
-    // add newly selected items to playlistMedia with defaults
     if (added.length) {
       setplaylistMedia((prev) => {
         let next = [...prev];
@@ -136,9 +154,20 @@ const CreatePlaylist = (props) => {
           if (!next.find((p) => p.MediaRef === ref)) {
             const newSelId = selectionCounter;
             const isVideo = isVideoRef(ref);
-            // Minimum duration is 5 for images
             const durationForNew = isVideo ? null : (durationMode === 'Default' ? Number(defaultDuration) : 10);
-            next.push({ MediaRef: ref, IsActive: 1, SelectionId: newSelId, Duration: durationForNew });
+            
+            // FIXED: Store complete media object, not just ref
+            const mediaItem = mediaData.find((m) => m.MediaRef === ref) || globalMediaMetadata[ref];
+            const fullMediaObject = {
+              MediaRef: ref,
+              IsActive: 1,
+              SelectionId: newSelId,
+              Duration: durationForNew,
+              // Store all metadata
+              ...extractMediaMetadata(mediaItem || { MediaRef: ref })
+            };
+            
+            next.push(fullMediaObject);
             setSelectionCounter((c) => c + 1);
           }
         });
@@ -146,7 +175,6 @@ const CreatePlaylist = (props) => {
       });
     }
 
-    // for removals, move them to deleted list (to preserve edit behavior)
     if (removed.length) {
       setplaylistMedia((prev) => {
         let next = [...prev];
@@ -154,7 +182,12 @@ const CreatePlaylist = (props) => {
           const idx = next.findIndex((p) => p.MediaRef === ref);
           if (idx !== -1) {
             const [item] = next.splice(idx, 1);
-            setdeletedplaylistMedia((d) => [...d, { MediaRef: item.MediaRef, IsActive: 0, SelectionId: item.SelectionId, Duration: item.Duration || null }]);
+            setdeletedplaylistMedia((d) => [...d, { 
+              MediaRef: item.MediaRef, 
+              IsActive: 0, 
+              SelectionId: item.SelectionId, 
+              Duration: item.Duration || null 
+            }]);
           }
         });
         return next;
@@ -164,34 +197,6 @@ const CreatePlaylist = (props) => {
     setSelectedRefs(newSelected);
   };
 
-  // Toggle selection: only one selection per media allowed.
-  function handleSelectPlaylist(item) {
-    setplaylistMedia((prev) => {
-      const existing = prev.find((p) => p.MediaRef === item.MediaRef);
-      if (existing) {
-        // unselect: move to deleted list (for edits) and remove from active
-        setdeletedplaylistMedia((delPrev) => [
-          ...delPrev,
-          { MediaRef: existing.MediaRef, IsActive: 0, SelectionId: existing.SelectionId, Duration: existing.Duration || null }
-        ]);
-        setSelectedRefs((s) => s.filter((r) => r !== item.MediaRef));
-        return prev.filter((p) => p.SelectionId !== existing.SelectionId);
-      }
-
-      // select: remove any deleted record for this media then add new selection
-      setdeletedplaylistMedia((delPrev) => delPrev.filter((d) => d.MediaRef !== item.MediaRef));
-      const newId = selectionCounter;
-      setSelectionCounter((c) => c + 1);
-      const isVideo = isVideoRef(item.MediaRef);
-      // Minimum duration is 5 for images
-      const durationForNew = isVideo ? null : (durationMode === 'Default' ? Number(defaultDuration) : 10);
-      setSelectedRefs((s) => [...s, item.MediaRef]);
-      // default Duration based on mode
-      return [...prev, { MediaRef: item.MediaRef, IsActive: 1, SelectionId: newId, Duration: durationForNew }];
-    });
-  }
-
-  // Remove a specific selection badge (by SelectionId) — used by badge click (keeps deleted list behavior)
   function removeSelection(selectionId) {
     setplaylistMedia((prev) => {
       const toRemove = prev.find((p) => p.SelectionId === selectionId);
@@ -207,27 +212,23 @@ const CreatePlaylist = (props) => {
     });
   }
 
-  // adjust duration (delta can be +1 / -1) for images only
   function adjustDuration(mediaRef, delta) {
     setplaylistMedia((prev) =>
       prev.map((p) => {
         if (p.MediaRef !== mediaRef) return p;
-        // skip videos
         if (isVideoRef(mediaRef)) return p;
         let next = Number(p.Duration || 10) + delta;
         if (next < 5) {
-          setDurationError(true); // immediate feedback for button presses
-          next = 5; // Minimum 5 seconds
+          setDurationError(true);
+          next = 5;
         }
-        if (next > 60) next = 60; // clamp to 60
+        if (next > 60) next = 60;
         return { ...p, Duration: next };
       })
     );
   }
 
   function onDurationInputChange(mediaRef, value) {
-    // allow typing but validate on change
-    // If empty string while typing, allow it temporarily
     if (value === '') {
       setplaylistMedia((prev) =>
         prev.map((p) => (p.MediaRef === mediaRef ? { ...p, Duration: '' } : p))
@@ -235,7 +236,6 @@ const CreatePlaylist = (props) => {
       return;
     }
 
-    // Only accept pure digit input; ignore other characters (do not show error for non-numeric input)
     const digitsOnly = /^\d+$/.test(value);
     if (!digitsOnly) {
       return;
@@ -243,10 +243,9 @@ const CreatePlaylist = (props) => {
 
     const parsed = parseInt(value, 10);
 
-    // If numeric and below minimum, immediately show popup and coerce to 5
     let next = parsed;
     if (parsed < 5) {
-      setDurationError(true); // show popup only when numeric value < 5
+      setDurationError(true);
       next = 5;
     }
 
@@ -261,10 +260,8 @@ const CreatePlaylist = (props) => {
     setplaylistMedia((prev) =>
       prev.map((p) => {
         if (p.MediaRef !== mediaRef) return p;
-        // videos should keep null
         if (isVideoRef(mediaRef)) return p;
         let value = Number(p.Duration);
-        // Enforce minimum 5 seconds on blur
         if (isNaN(value) || value < 5) {
           setDurationError(true);
           value = 5;
@@ -275,19 +272,12 @@ const CreatePlaylist = (props) => {
     );
   }
 
-  function handlePriority(mediaRef) {
-    const priorityIndex = playlistMedia.findIndex((i) => i.MediaRef === mediaRef) + 1;
-    return priorityIndex > 0 ? priorityIndex : '';
-  }
-
-  // When defaultDuration changes and mode is Default — apply to all images in playlist
   useEffect(() => {
     if (durationMode !== 'Default') return;
     setplaylistMedia((prev) => prev.map((p) => (isVideoRef(p.MediaRef) ? { ...p, Duration: null } : { ...p, Duration: Number(defaultDuration) })));
-  }, [defaultDuration, durationMode]); // eslint-disable-line
+  }, [defaultDuration, durationMode]);
 
   function savePlaylistDetails() {
-    // client-side required validation for playlist name
     if (!title || title.toString().trim() === '') {
       setcolor('error');
       setboxMessage('Title is required');
@@ -295,20 +285,17 @@ const CreatePlaylist = (props) => {
       window.scrollTo(0, 0);
       return;
     }
-    // before save: sanitize durations (set numeric defaults for images, null for videos)
     const sanitizedPlaylist = playlistMedia.map((p) => {
       const isVideo = isVideoRef(p.MediaRef);
       let dur = p.Duration;
       if (isVideo) dur = null;
       else {
         const n = Number(dur || (durationMode === 'Default' ? defaultDuration : 10));
-        // Enforce minimum 5 seconds on save
         dur = isNaN(n) ? 10 : Math.min(60, Math.max(5, n));
       }
       return { MediaRef: p.MediaRef, IsActive: p.IsActive, Duration: dur };
     });
 
-    // send keys that match backend validation (lowercase top-level names)
     const savePlaylistData = {
       playlistName: title,
       description: description,
@@ -331,58 +318,44 @@ const CreatePlaylist = (props) => {
     });
   }
 
-  // Add new state to store full media metadata for selected items
-  const [selectedMediaMetadata, setSelectedMediaMetadata] = useState({});
-
-  // Pre-populate playlist media selections on Edit/View
   useEffect(() => {
     if ((type === 'Edit' || type === 'View') && state && state.Media && state.Media.length > 0) {
-      // Map playlist media to selection objects
       const initialSelections = state.Media.map((m, idx) => {
         let duration = m.Duration;
-        // Enforce minimum 5 seconds for loaded playlist items
         if (duration !== undefined && duration !== null && !m.MediaType?.toLowerCase().includes('video')) {
           duration = Math.max(5, Number(duration) || 10);
         }
+        
+        // FIXED: Store complete media object with all metadata
         return {
           MediaRef: m.MediaRef,
           IsActive: m.IsActive !== undefined ? m.IsActive : 1,
           SelectionId: idx + 1,
-          Duration: duration !== undefined ? duration : (m.MediaType && m.MediaType.toLowerCase().includes('video') ? null : 10)
+          Duration: duration !== undefined ? duration : (m.MediaType && m.MediaType.toLowerCase().includes('video') ? null : 10),
+          // Store all metadata
+          MediaName: m.MediaName || m.fileName || m.FileName || 'Unknown',
+          MediaPath: m.MediaPath || m.fileUrl || m.FileUrl || '',
+          Thumbnail: m.Thumbnail || m.thumbnailUrl || m.ThumbnailUrl || m.posterFrame || m.MediaPath || '',
+          MediaType: m.MediaType || m.FileType || '',
+          FileMimetype: m.MediaType || m.FileType || ''
         };
       });
+      
       setplaylistMedia(initialSelections.filter(sel => sel.IsActive === 1));
       setdeletedplaylistMedia(initialSelections.filter(sel => sel.IsActive === 0));
       setSelectedRefs(initialSelections.filter(sel => sel.IsActive === 1).map(sel => sel.MediaRef));
       setSelectionCounter(initialSelections.length + 1);
 
-      // Store metadata from state.Media if it has MediaName and MediaPath
+      // Update global metadata
       const metadataMap = {};
-      state.Media.forEach((m) => {
+      initialSelections.forEach((m) => {
         if (m.MediaRef) {
-          metadataMap[m.MediaRef] = {
-            MediaRef: m.MediaRef,
-            MediaName: m.MediaName || m.fileName || m.FileName || 'Unknown',
-            MediaPath: m.MediaPath || m.fileUrl || m.FileUrl || '',
-            Thumbnail: m.Thumbnail || m.thumbnailUrl || m.ThumbnailUrl || '',
-            MediaType: m.MediaType || m.FileType || ''
-          };
+          metadataMap[m.MediaRef] = extractMediaMetadata(m);
         }
       });
-      setSelectedMediaMetadata(metadataMap);
+      setGlobalMediaMetadata((prev) => ({ ...prev, ...metadataMap }));
     }
   }, [type, state]);
-
-  // Do NOT reset selectedRefs when switching tabs if editing
-  useEffect(() => {
-    if (type === 'Create') {
-      setSelectedRefs([]);
-      setplaylistMedia([]);
-      setdeletedplaylistMedia([]);
-      setSelectionCounter(1);
-    }
-    // For Edit/View, keep selections
-  }, [mediaTypeFilter, type]);
 
   return (
     <>
@@ -574,39 +547,10 @@ const CreatePlaylist = (props) => {
                     <Typography variant="h6" sx={{ mb: 1 }}>Selected items ({playlistMedia.length})</Typography>
                     <Grid container spacing={1}>
                       {playlistMedia.map((p, idx) => {
-                        // Try to find in current mediaData first, then fall back to selectedMediaMetadata
-                        let mediaItem = mediaData.find(m => m.MediaRef === p.MediaRef);
-                        
-                        if (!mediaItem && selectedMediaMetadata[p.MediaRef]) {
-                          mediaItem = selectedMediaMetadata[p.MediaRef];
-                        }
-                        
-                        if (!mediaItem) {
-                          mediaItem = {};
-                        }
-
+                        // FIXED: Media metadata is already stored in the playlist item
+                        const mediaName = p.MediaName || 'Unknown Media';
+                        const thumbnailUrl = p.Thumbnail || p.MediaPath || '';
                         const isVideo = isVideoRef(p.MediaRef);
-                        
-                        // Extract media name from various possible field names
-                        const mediaName = mediaItem.MediaName || 
-                                         mediaItem.fileName || 
-                                         mediaItem.FileName || 
-                                         mediaItem.Name || 
-                                         mediaItem.name ||
-                                         mediaItem.Title || 
-                                         mediaItem.title ||
-                                         p.MediaRef; // fallback to MediaRef only if absolutely nothing else
-                        
-                        // Extract thumbnail URL from various possible field names
-                        const thumbnailUrl = mediaItem.MediaPath || 
-                                            mediaItem.fileUrl || 
-                                            mediaItem.FileUrl || 
-                                            mediaItem.FileURL ||
-                                            mediaItem.url ||
-                                            mediaItem.Thumbnail ||
-                                            mediaItem.thumbnailUrl ||
-                                            mediaItem.ThumbnailUrl ||
-                                            '';
 
                         return (
                           <Grid item xs={12} md={6} key={p.SelectionId}>
