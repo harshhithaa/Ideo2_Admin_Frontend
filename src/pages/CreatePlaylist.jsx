@@ -313,7 +313,9 @@ const CreatePlaylist = (props) => {
         setboxMessage(err.errmessage || 'Error saving playlist');
         setbox(true);
       } else {
-        navigate('/app/playlists', { replace: true });
+        // Show different flash message for Edit vs Create
+        const successMessage = (type === 'Edit' || id !== '') ? 'Playlist Edited Successfully' : 'Playlist Created Successfully';
+        navigate('/app/playlists', { replace: true, state: { flashMessage: successMessage } });
       }
     });
   }

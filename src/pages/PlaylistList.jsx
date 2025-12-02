@@ -16,11 +16,12 @@ import {
   validateDeleteComponentList,
   deleteComponentList
 } from '../store/action/user';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Alert, Stack } from '@mui/material';
 
 const PlaylistList = (props) => {
   const { component } = props || null;
+  const location = useLocation();
   const [playlists, setplaylists] = useState([]);
   const [loader, setloader] = useState(false);
   const [selected, setselected] = useState([]);
@@ -32,6 +33,22 @@ const PlaylistList = (props) => {
   const [boxMessage, setboxMessage] = useState('');
   const [color, setcolor] = useState('success');
 
+  // Show flash message when navigated here after creating a playlist
+  useEffect(() => {
+    if (location && location.state && location.state.flashMessage) {
+      setcolor('success');
+      setboxMessage(location.state.flashMessage);
+      setbox(true);
+    }
+  }, [location]);
+
+  // Auto-dismiss the top-center popup after 2 seconds
+  useEffect(() => {
+    if (!box) return undefined;
+    const t = setTimeout(() => setbox(false), 2000);
+    return () => clearTimeout(t);
+  }, [box]);
+  
   console.log('props', selected);
   let navigate = useNavigate();
   useEffect(() => {
@@ -48,15 +65,18 @@ const PlaylistList = (props) => {
     });
   }, [loader]);
   const style = {
-    position: 'absolute',
-    top: '50%',
+    // show popup at top center
+    position: 'fixed',
+    top: 16,
     left: '50%',
-    transform: 'translate(-50%, -50%)',
+    transform: 'translateX(-50%)',
     width: 500,
+    maxWidth: '90%',
     bgcolor: 'background.paper',
     border: '2px solid #000',
     boxShadow: 24,
-    p: 4
+    p: 4,
+    zIndex: 1400
   };
 
   const deleteplaylist = () => {
