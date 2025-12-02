@@ -60,6 +60,13 @@ const SaveScheduleDetails = (props) => {
   const [popupMessage, setPopupMessage] = useState('');
   const [popupSeverity, setPopupSeverity] = useState('success');
 
+  // Add refs for time inputs
+  const startTimeRef = React.useRef(null);
+  const endTimeRef = React.useRef(null);
+
+  // Add state for time validation error
+  const [timeError, setTimeError] = useState('');
+
   // Days state
   const [days, setDays] = useState({
     sunday: false,
@@ -94,6 +101,21 @@ const SaveScheduleDetails = (props) => {
   const daysKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const selectedDaysArray = daysKeys.filter((k) => days[k]);
 
+  // Validate end time is not before start time
+  const validateTime = (start, end) => {
+    if (start && end) {
+      const [startHour, startMin] = start.split(':').map(Number);
+      const [endHour, endMin] = end.split(':').map(Number);
+      
+      if (endHour < startHour || (endHour === startHour && endMin <= startMin)) {
+        setTimeError('End time must be after start time');
+        return false;
+      }
+    }
+    setTimeError('');
+    return true;
+  };
+
   const handleDaysToggle = (event, newSelected) => {
     const next = {};
     daysKeys.forEach((k) => {
@@ -112,7 +134,8 @@ const SaveScheduleDetails = (props) => {
       startTime !== '' &&
       endTime !== '' &&
       selectedPlaylist !== '' &&
-      selectedDaysArray.length > 0
+      selectedDaysArray.length > 0 &&
+      !timeError
     );
   };
 
@@ -277,7 +300,19 @@ const SaveScheduleDetails = (props) => {
                   label="Start Time"
                   type="time"
                   value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
+                  onChange={(e) => {
+                    setStartTime(e.target.value);
+                    validateTime(e.target.value, endTime);
+                    // Auto-close when both hour and minute are set
+                    if (e.target.value && e.target.value.includes(':')) {
+                      setTimeout(() => {
+                        if (startTimeRef.current) {
+                          startTimeRef.current.blur();
+                        }
+                      }, 100);
+                    }
+                  }}
+                  inputRef={startTimeRef}
                   fullWidth
                   required
                   InputLabelProps={{ shrink: true, sx: labelSx }}
@@ -290,9 +325,23 @@ const SaveScheduleDetails = (props) => {
                   label="End Time"
                   type="time"
                   value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
+                  onChange={(e) => {
+                    setEndTime(e.target.value);
+                    validateTime(startTime, e.target.value);
+                    // Auto-close when both hour and minute are set
+                    if (e.target.value && e.target.value.includes(':')) {
+                      setTimeout(() => {
+                        if (endTimeRef.current) {
+                          endTimeRef.current.blur();
+                        }
+                      }, 100);
+                    }
+                  }}
+                  inputRef={endTimeRef}
                   fullWidth
                   required
+                  error={!!timeError}
+                  helperText={timeError}
                   InputLabelProps={{ shrink: true, sx: labelSx }}
                   size="medium"
                 />
