@@ -134,6 +134,9 @@ const MonitorListToolbar = (props) => {
             />
 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {/* Select All Button */}
+   
+
               {/* <Typography fontSize={16} sx={{ display: { xs: 'none', sm: 'block' } }}>
                 Select Playlist:
               </Typography> */}

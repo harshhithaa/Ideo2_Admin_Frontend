@@ -15,11 +15,12 @@ import {
   validateDeleteComponentList,
   deleteComponentList
 } from '../store/action/user';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Alert, Stack } from '@mui/material';
 
 const ScheduleList = (props) => {
   const { schedule } = props || {};
+  const location = useLocation();
   const [scheduleItem, setSchedules] = useState([]);
   const [loader, setLoader] = useState(false);
   const [selected, setselected] = useState([]);
@@ -27,6 +28,7 @@ const ScheduleList = (props) => {
   const [showErrModal, setErrModal] = useState(false);
   const [search, setsearch] = useState('');
   const [monitor, setMonitor] = useState([]);
+  const [deletedIds, setDeletedIds] = useState(new Set());
 
   const [box, setbox] = useState(false);
   const [boxMessage, setboxMessage] = useState('');
@@ -42,11 +44,21 @@ const ScheduleList = (props) => {
       if (err.exists) {
         console.log(err);
       } else {
-        setSchedules(schedule ? schedule.scheduleList : []);
+        // Filter out any deleted schedules from Redux data
+        const filteredSchedules = (schedule?.scheduleList || []).filter((sch) => {
+          const scheduleId = sch.Id || sch.id || sch.ScheduleId;
+          return !deletedIds.has(scheduleId);
+        });
+        setSchedules(filteredSchedules);
         setLoader(true);
       }
+      
+      // Clear the refresh flag
+      if (location.state?.refresh) {
+        window.history.replaceState({}, document.title);
+      }
     });
-  }, [loader]);
+  }, [loader, location.state?.refresh]);
 
   const style = {
     position: 'absolute',
@@ -68,6 +80,7 @@ const ScheduleList = (props) => {
 
     console.log('selected', selected);
     setModal(false);
+    
     props.validateDeleteComponentList(deleteData, (err) => {
       if (err.exists) {
         console.log(err);
@@ -79,35 +92,56 @@ const ScheduleList = (props) => {
           });
           setErrModal(true);
         } else {
+          // Store deleted IDs permanently
+          setDeletedIds((prev) => {
+            const newSet = new Set(prev);
+            selected.forEach(id => newSet.add(id));
+            return newSet;
+          });
+
+          // INSTANT REMOVAL: Remove items from UI immediately BEFORE API call
+          setSchedules((prevSchedules) => {
+            return prevSchedules.filter((schedule) => {
+              const scheduleId = schedule.Id || schedule.id || schedule.ScheduleId;
+              return !selected.includes(scheduleId);
+            });
+          });
+
+          // Clear selection immediately
+          setselected([]);
+
+          // Show success message immediately
+          setcolor('success');
+          setboxMessage('Schedule Deleted Successfully!');
+          setbox(true);
+
+          // Now make the API call in the background
           props.deleteComponentList(deleteData, (err) => {
             if (err.exists) {
-              setcolor('error');
-              setboxMessage(err.err);
-              setbox(true);
-              console.log(err.errmessage);
-            } else {
-              // Immediately remove deleted items from UI
-              setSchedules((prevSchedules) => {
-                return prevSchedules.filter((schedule) => {
-                  const scheduleId = schedule.Id || schedule.id || schedule.ScheduleId;
-                  return !selected.includes(scheduleId);
-                });
+              // If deletion failed, rollback by removing from deletedIds
+              console.error('Deletion failed:', err);
+              setDeletedIds((prev) => {
+                const newSet = new Set(prev);
+                selected.forEach(id => newSet.delete(id));
+                return newSet;
               });
-
-              // Clear selection after deletion
-              setselected([]);
-
-              // Show success message
-              setcolor('success');
-              setboxMessage('Schedule Deleted Successfully!');
+              
+              setcolor('error');
+              setboxMessage(err.err || 'Failed to delete schedule');
               setbox(true);
-
-              // Auto-hide success message after 3 seconds
-              setTimeout(() => {
-                setbox(false);
-              }, 3000);
+              
+              // Refetch to restore deleted items
+              setLoader(false);
+            } else {
+              // Success - items permanently deleted
+              console.log('Schedule deleted successfully from backend');
             }
           });
+
+          // Auto-hide success message
+          setTimeout(() => {
+            setbox(false);
+          }, 3000);
         }
       }
     });
