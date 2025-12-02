@@ -176,7 +176,8 @@ export default function userReducer(state = initialState, action) {
           ...state.user,
           components: {
             ...state.user.components,
-            scheduleList: action.payload
+            monitorDetails: action.payload.Monitor,
+            monitorSchedules: action.payload.Schedules
           }
         }
       };

@@ -168,16 +168,12 @@ const SaveMonitorDetails = (props) => {
       MonitorName: title,
       Description: description,
       DefaultPlaylistRef: selectedPlaylist,
-      Schedules: [...selectedSchedules, ...deletedSchedules],
+      Schedules: [...selectedSchedules, ...deletedSchedules], // deletedSchedules: [{ScheduleRef, IsActive: 0}]
       IsActive: 1,
       Orientation: orientation === 'Landscape' ? '90' : '0'
-      // SlideTime removed
     };
     if (MonitorRef !== '') saveMonitorDetails.MonitorRef = MonitorRef;
 
-    console.log('saveMonitorDetails Request', saveMonitorDetails);
-
-    // setDisable(true);
     props.saveMonitor(saveMonitorDetails, (err) => {
       if (err.exists) {
         window.scrollTo(0, 0);

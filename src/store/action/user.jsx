@@ -513,7 +513,6 @@ export const getUserComponentDetails = (data, callback) => (dispatch) => {
   try {
     Api.get(
       '/admin/componentdetails',
-
       {
         params: data,
         headers: {
@@ -525,7 +524,6 @@ export const getUserComponentDetails = (data, callback) => (dispatch) => {
         if (!res.data.Error) {
           const dataObj = res.data.Details;
 
-          console.log('dataObj', dataObj);
           if (data.ComponentType === COMPONENTS.Monitor) {
             dispatch({
               type: GETUSERMONITORDETAILS,
