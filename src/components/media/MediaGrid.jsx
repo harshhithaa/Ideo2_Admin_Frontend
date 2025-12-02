@@ -46,7 +46,15 @@ const MediaGrid = ({ media = [], setselected, selected = [], columns = 6 }) => {
     const src = buildSrc(item?.MediaPath);
     const thumb = buildSrc(item?.Thumbnail || item?.MediaThumb || item?.Poster);
     const rawType = (item?.MediaType || '').toString().toLowerCase();
-    const isVideo = rawType.startsWith('video') || (item?.MediaName || '').toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
+    
+    // ✅ ENHANCED TYPE DETECTION
+    const isGif = rawType === 'gif' || 
+                  rawType.includes('gif') || 
+                  (item?.MediaName || '').toLowerCase().endsWith('.gif');
+    
+    const isVideo = rawType === 'video' || 
+                    rawType.includes('video') ||
+                    (item?.MediaName || '').toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
 
     const imgOnError = (e) => {
       e.currentTarget.style.display = 'none';
@@ -106,6 +114,19 @@ const MediaGrid = ({ media = [], setselected, selected = [], columns = 6 }) => {
                 <div style={placeholderStyle}>No media</div>
               </div>
             )
+          ) : isGif ? (
+            src ? (
+              <img
+                src={src}
+                alt={item.MediaName || item.MediaRef}
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={imgOnError}
+              />
+            ) : (
+              <div style={{ position: 'absolute', inset: 0 }}>
+                <div style={placeholderStyle}>No media</div>
+              </div>
+            )
           ) : (
             src ? (
               <img
@@ -159,4 +180,3 @@ MediaGrid.propTypes = {
  };
 
  export default MediaGrid;
- 

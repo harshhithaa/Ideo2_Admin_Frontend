@@ -514,6 +514,10 @@ const CreatePlaylist = (props) => {
                           <Button variant={mediaTypeFilter === 'video' ? 'contained' : 'outlined'} onClick={() => { setMediaTypeFilter('video'); }}>
                             VIDEOS
                           </Button>
+                          {/* ✅ ADD GIF BUTTON */}
+                          <Button variant={mediaTypeFilter === 'gif' ? 'contained' : 'outlined'} onClick={() => { setMediaTypeFilter('gif'); }}>
+                            GIFS
+                          </Button>
                         </Box>
 
                         <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>

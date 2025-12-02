@@ -40,22 +40,52 @@ const MediaList = (props) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('IMAGES');
 
-  // Pagination states
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(12);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [loading, setLoading] = useState(false);
+  // ✅ SEPARATE STATE FOR EACH TAB
+  const [imagePage, setImagePage] = useState(1);
+  const [videoPage, setVideoPage] = useState(1);
+  const [gifPage, setGifPage] = useState(1);
 
-  // Filter states
-  // default to images so initial load shows image count
-  const [mediaTypeFilter, setMediaTypeFilter] = useState('image');
+  const [imageTotalPages, setImageTotalPages] = useState(0);
+  const [videoTotalPages, setVideoTotalPages] = useState(0);
+  const [gifTotalPages, setGifTotalPages] = useState(0);
+
+  const [imageTotalRecords, setImageTotalRecords] = useState(0);
+  const [videoTotalRecords, setVideoTotalRecords] = useState(0);
+  const [gifTotalRecords, setGifTotalRecords] = useState(0);
+
+  const pageSize = 12;
+  const [loading, setLoading] = useState(false);
 
   const [box, setbox] = useState(false);
   const [boxMessage, setboxMessage] = useState('');
   const [color, setcolor] = useState('success');
 
   const navigate = useNavigate();
+
+  // ✅ GET CURRENT PAGE AND TOTALS BASED ON ACTIVE TAB
+  const getCurrentPage = () => {
+    if (activeTab === 'IMAGES') return imagePage;
+    if (activeTab === 'VIDEOS') return videoPage;
+    return gifPage;
+  };
+
+  const getCurrentTotalPages = () => {
+    if (activeTab === 'IMAGES') return imageTotalPages;
+    if (activeTab === 'VIDEOS') return videoTotalPages;
+    return gifTotalPages;
+  };
+
+  const getCurrentTotalRecords = () => {
+    if (activeTab === 'IMAGES') return imageTotalRecords;
+    if (activeTab === 'VIDEOS') return videoTotalRecords;
+    return gifTotalRecords;
+  };
+
+  const setCurrentPage = (page) => {
+    if (activeTab === 'IMAGES') setImagePage(page);
+    else if (activeTab === 'VIDEOS') setVideoPage(page);
+    else setGifPage(page);
+  };
 
   const buildSrc = (rawPath) => {
     if (!rawPath) return null;
@@ -67,117 +97,110 @@ const MediaList = (props) => {
     try { return `${window.location.origin}/${encodeURI(p)}`; } catch (e) { return p; }
   };
 
-  const fetchMediaList = async (page = currentPage, size = pageSize, search = searchQuery, mediaType = mediaTypeFilter) => {
+  // ✅ UNIFIED FETCH FUNCTION WITH TAB-SPECIFIC STATE
+  const fetchMediaList = async (page, mediaType, search = searchQuery) => {
     setLoading(true);
 
-    const aggregateFiltered = [];
-    let requestPage = page;
-    let reachedEnd = false;
-    let serverTotalRecords = null;
+    const requestData = {
+      componenttype: 1,
+      searchText: search || '',
+      mediaType: mediaType || null,
+      isActive: 1,
+      userId: null,
+      pageNumber: page,
+      pageSize: pageSize
+    };
 
-    // keep fetching subsequent server pages until we have 'size' filtered items or no more server data
-    while (aggregateFiltered.length < size && !reachedEnd) {
-      const requestData = {
-        componenttype: 1,
-        searchText: search || '',
-        mediaType: mediaType || null,
-        isActive: 1,
-        userId: null,
-        pageNumber: requestPage,
-        pageSize: size // request same size from server per page
-      };
+    return new Promise((resolve) => {
+      props.getUserComponentListWithPagination(requestData, (res) => {
+        setLoading(false);
 
-      // wrap the callback-based action in a promise to use async/await
-      // eslint-disable-next-line no-await-in-loop
-      const response = await new Promise((resolve) => {
-        props.getUserComponentListWithPagination(requestData, (res) => resolve(res));
-      });
-
-      if (!response || response.exists) {
-        reachedEnd = true;
-        break;
-      }
-
-      const data = response.data || {};
-      const componentList = data.ComponentList || [];
-
-      // capture server total if provided
-      if (serverTotalRecords === null && Number.isFinite(Number(data.TotalRecords))) {
-        serverTotalRecords = Number(data.TotalRecords);
-      }
-
-      // Stronger filtering to ensure GIFs don't show under IMAGES
-      const filteredPage = componentList.filter((item) => {
-        const mt = (item?.MediaType || '').toString().toLowerCase();
-        const name = (item?.MediaName || '').toString().toLowerCase();
-        const path = (item?.MediaPath || '').toString().toLowerCase();
-
-        const isGif = mt.includes('gif') || name.endsWith('.gif') || path.includes('.gif');
-        const isVideo = mt.startsWith('video') || mt.includes('video') ||
-          name.match(/\.(mp4|webm|ogg|mov|avi|mkv)$/) || path.match(/\.(mp4|webm|ogg|mov|avi|mkv)$/);
-
-        // Debug logging - remove after fixing
-        if (name.includes('.gif')) {
-          console.log('GIF detected:', { name, mt, path, isGif, mediaType, willShow: mediaType === 'gif' ? isGif : false });
+        if (!res || res.exists) {
+          setMedia([]);
+          if (mediaType === 'image') {
+            setImageTotalRecords(0);
+            setImageTotalPages(0);
+          } else if (mediaType === 'video') {
+            setVideoTotalRecords(0);
+            setVideoTotalPages(0);
+          } else if (mediaType === 'gif') {
+            setGifTotalRecords(0);
+            setGifTotalPages(0);
+          }
+          resolve();
+          return;
         }
 
-        if (mediaType === 'gif') return isGif;
-        if (mediaType === 'video') return isVideo && !isGif;
-        // For images, exclude both gifs and videos
-        return !isGif && !isVideo;
+        const data = res.data || {};
+        const componentList = data.ComponentList || [];
+        const totalRecords = componentList.length > 0 && componentList[0].TotalRecords 
+          ? Number(componentList[0].TotalRecords) 
+          : (data.TotalRecords || 0);
+
+        setMedia(componentList);
+
+        if (mediaType === 'image') {
+          setImageTotalRecords(totalRecords);
+          setImageTotalPages(Math.ceil(totalRecords / pageSize));
+        } else if (mediaType === 'video') {
+          setVideoTotalRecords(totalRecords);
+          setVideoTotalPages(Math.ceil(totalRecords / pageSize));
+        } else if (mediaType === 'gif') {
+          setGifTotalRecords(totalRecords);
+          setGifTotalPages(Math.ceil(totalRecords / pageSize));
+        }
+
+        resolve();
       });
-
-      aggregateFiltered.push(...filteredPage);
-
-      // if server returned fewer items than requested, we've reached the backend end
-      if (componentList.length < size) {
-        reachedEnd = true;
-      } else {
-        // prepare to fetch next server page only if needed
-        requestPage += 1;
-      }
-    }
-
-    setLoading(false);
-
-    // final displayed list: exactly 'size' items (or fewer if total available < size)
-    const finalList = aggregateFiltered.slice(0, size);
-    setMedia(finalList);
-
-    // determine totalRecords: prefer server-provided total if available, else use aggregated filtered count
-    const finalTotal = Number.isFinite(Number(serverTotalRecords)) ? serverTotalRecords : aggregateFiltered.length;
-    setTotalRecords(finalTotal);
-    setTotalPages(Math.ceil(finalTotal / size));
+    });
   };
 
-  // initial load
-  useEffect(() => { fetchMediaList(1, pageSize, searchQuery, mediaTypeFilter); }, []);
-
+  // ✅ INITIAL LOAD - IMAGES TAB
   useEffect(() => {
-    // when filters or page changes refetch
-    fetchMediaList(currentPage, pageSize, searchQuery, mediaTypeFilter);
-  }, [currentPage, pageSize, mediaTypeFilter]);
+    fetchMediaList(1, 'image', '');
+  }, []);
 
-  // Handle search
+  // ✅ REFETCH WHEN TAB CHANGES
+  useEffect(() => {
+    let mediaType = '';
+    if (activeTab === 'IMAGES') mediaType = 'image';
+    else if (activeTab === 'VIDEOS') mediaType = 'video';
+    else if (activeTab === 'GIFS') mediaType = 'gif';
+
+    fetchMediaList(getCurrentPage(), mediaType, searchQuery);
+  }, [activeTab]);
+
+  // ✅ REFETCH WHEN PAGE CHANGES
+  useEffect(() => {
+    let mediaType = '';
+    if (activeTab === 'IMAGES') mediaType = 'image';
+    else if (activeTab === 'VIDEOS') mediaType = 'video';
+    else if (activeTab === 'GIFS') mediaType = 'gif';
+
+    fetchMediaList(getCurrentPage(), mediaType, searchQuery);
+  }, [imagePage, videoPage, gifPage]);
+
+  // ✅ HANDLE SEARCH
   const handleSearch = (query) => {
     setSearchQuery(query);
-    setCurrentPage(1);
-    fetchMediaList(1, pageSize, query, mediaTypeFilter);
+    let mediaType = '';
+    if (activeTab === 'IMAGES') {
+      mediaType = 'image';
+      setImagePage(1);
+    } else if (activeTab === 'VIDEOS') {
+      mediaType = 'video';
+      setVideoPage(1);
+    } else if (activeTab === 'GIFS') {
+      mediaType = 'gif';
+      setGifPage(1);
+    }
+    fetchMediaList(1, mediaType, query);
   };
 
+  // ✅ HANDLE TAB CHANGE
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
-    let type = '';
-    if (newValue === 'VIDEOS') type = 'video';
-    else if (newValue === 'GIFs') type = 'gif';
-    else if (newValue === 'IMAGES') type = 'image';
-    setMediaTypeFilter(type);
-    setCurrentPage(1);
-    // clear previous numbers immediately to avoid showing old counts briefly
-    setTotalRecords(0);
-    setTotalPages(0);
     setMedia([]);
-    fetchMediaList(1, pageSize, searchQuery, type);
   };
 
   const style = {
@@ -203,7 +226,14 @@ const MediaList = (props) => {
           setcolor('error'); setboxMessage(delErr.err || delErr.errmessage || 'Delete failed'); setbox(true);
         } else {
           setcolor('success'); setboxMessage('Media Deleted Successfully!'); setbox(true); setselected([]);
-          fetchMediaList(currentPage, pageSize, searchQuery, mediaTypeFilter);
+          
+          // ✅ REFRESH CURRENT TAB AFTER DELETE
+          let mediaType = '';
+          if (activeTab === 'IMAGES') mediaType = 'image';
+          else if (activeTab === 'VIDEOS') mediaType = 'video';
+          else if (activeTab === 'GIFS') mediaType = 'gif';
+          
+          fetchMediaList(getCurrentPage(), mediaType, searchQuery);
         }
       });
     });
@@ -221,7 +251,12 @@ const MediaList = (props) => {
     const src = buildSrc(item?.MediaPath);
     const thumb = buildSrc(item?.Thumbnail || item?.MediaThumb || item?.Poster);
     const rawType = (item?.MediaType || '').toString().toLowerCase();
-    const isVideo = rawType.startsWith('video') || (item?.MediaName || '').toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
+    
+    // ✅ PROPER TYPE DETECTION
+    const isGif = rawType === 'gif';
+    const isVideo = rawType === 'video';
+    const isImage = rawType === 'image';
+    
     const isSelected = selected.indexOf(item.MediaRef) !== -1;
 
     return (
@@ -230,39 +265,52 @@ const MediaList = (props) => {
           position: 'relative', borderRadius: '8px', overflow: 'hidden',
           bgcolor: '#fff', cursor: 'pointer',
           border: isSelected ? '2px solid #1976d2' : '1px solid #e5e7eb',
-          transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.1)', transform: 'translateY(-2px)' }
+          transition: 'all 0.2s ease', 
+          '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.1)', transform: 'translateY(-2px)' }
         }}
       >
-        <Checkbox checked={isSelected} onClick={(e) => e.stopPropagation()} onChange={() => toggleSelection(item.MediaRef)}
-          sx={{ position: 'absolute', left: 8, top: 8, zIndex: 5, bgcolor: 'transparent', borderRadius: 0, padding: 0, '&:hover': { bgcolor: 'transparent' } }} />
+        <Checkbox checked={isSelected} onClick={(e) => e.stopPropagation()} 
+          onChange={() => toggleSelection(item.MediaRef)}
+          sx={{ position: 'absolute', left: 8, top: 8, zIndex: 5, bgcolor: 'transparent' }} />
+        
         <Box sx={{ width: '100%', paddingTop: '100%', position: 'relative', bgcolor: '#f4f4f4' }}>
           {isVideo ? (
             thumb ? (
-              <img src={thumb} alt={item.MediaName} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={thumb} alt={item.MediaName} 
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : src ? (
-              <video src={src} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
+              <video src={src} 
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} 
+                muted playsInline />
             ) : (
-              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>No media</Box>
+              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
+                No media
+              </Box>
             )
           ) : (
             src ? (
-              <img src={src} alt={item.MediaName} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={src} alt={item.MediaName} 
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
-              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>No media</Box>
+              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
+                No media
+              </Box>
             )
           )}
         </Box>
-        <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px', bgcolor: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.MediaName}</Box>
+        
+        <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px', bgcolor: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {item.MediaName}
+        </Box>
       </Box>
     );
   };
 
-  const handlePageChange = (event, value) => { setCurrentPage(value); fetchMediaList(value, pageSize, searchQuery, mediaTypeFilter); };
+  const handlePageChange = (event, value) => {
+    setCurrentPage(value);
+  };
 
-  // helper to know whether delete button should be enabled
   const hasSelection = Array.isArray(selected) && selected.length > 0;
-
-  // visible items on current page/grid
   const visibleRefs = Array.isArray(mediaItem) ? mediaItem.map((it) => it.MediaRef) : [];
   const allVisibleSelected = visibleRefs.length > 0 && visibleRefs.every((r) => selected.includes(r));
   const someVisibleSelected = visibleRefs.some((r) => selected.includes(r)) && !allVisibleSelected;
@@ -270,10 +318,8 @@ const MediaList = (props) => {
   const handleSelectAllVisible = () => {
     if (visibleRefs.length === 0) return;
     if (allVisibleSelected) {
-      // unselect all visible
       setselected((prev) => prev.filter((r) => !visibleRefs.includes(r)));
     } else {
-      // add all visible to selection (avoid duplicates)
       setselected((prev) => Array.from(new Set([...(prev || []), ...visibleRefs])));
     }
   };
@@ -290,26 +336,29 @@ const MediaList = (props) => {
 
       <Box sx={{ bgcolor: '#f5f5f5', minHeight: '100vh', py: 3 }}>
         <Container maxWidth={false}>
-          <Modal open={showmodal} onClose={() => setModal(false)}><Box sx={style}>
-            <h4 style={{ marginBottom: 20 }}>Are you sure you want to delete {selected.length} item(s)?</h4>
-            <Grid container spacing={2}><Grid item>
-              <Button variant="contained" color="success" onClick={() => deleteComponent()}>Yes</Button>
-            </Grid><Grid item>
-              <Button variant="contained" color="error" onClick={() => setModal(false)}>No</Button>
-            </Grid></Grid>
-          </Box></Modal>
+          <Modal open={showmodal} onClose={() => setModal(false)}>
+            <Box sx={style}>
+              <h4 style={{ marginBottom: 20 }}>Are you sure you want to delete {selected.length} item(s)?</h4>
+              <Grid container spacing={2}>
+                <Grid item><Button variant="contained" color="success" onClick={() => deleteComponent()}>Yes</Button></Grid>
+                <Grid item><Button variant="contained" color="error" onClick={() => setModal(false)}>No</Button></Grid>
+              </Grid>
+            </Box>
+          </Modal>
 
-          <Modal open={showErrModal} onClose={() => setErrModal(false)}><Box sx={style}>
-            <h4 style={{ marginBottom: 20 }}>Cannot delete this media as it is running in these playlists:</h4>
-            <ul style={{ marginBottom: 20 }}>{playlists.map((playlist, index) => <li key={index}>{playlist}</li>)}</ul>
-            <Grid container><Grid item>
-              <Button variant="contained" color="success" onClick={() => { setErrModal(false); setPlaylists([]); }}>Ok</Button>
-            </Grid></Grid>
-          </Box></Modal>
+          <Modal open={showErrModal} onClose={() => setErrModal(false)}>
+            <Box sx={style}>
+              <h4 style={{ marginBottom: 20 }}>Cannot delete this media as it is running in these playlists:</h4>
+              <ul style={{ marginBottom: 20 }}>{playlists.map((playlist, index) => <li key={index}>{playlist}</li>)}</ul>
+              <Grid container><Grid item>
+                <Button variant="contained" color="success" onClick={() => { setErrModal(false); setPlaylists([]); }}>Ok</Button>
+              </Grid></Grid>
+            </Box>
+          </Modal>
 
           {/* Top Toolbar */}
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0 }}>
-            <Box sx={{ width: '100%', maxWidth: 1400, p: 2, bgcolor: 'transparent', borderRadius: 0, boxShadow: 'none' }}>
+            <Box sx={{ width: '100%', maxWidth: 1400, p: 2, bgcolor: 'transparent' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                 {/* Search Box */}
                 <TextField
@@ -317,22 +366,14 @@ const MediaList = (props) => {
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   placeholder="Search Media"
-                  sx={{
-                    width: 220,
-                    bgcolor: 'transparent',
-                    mr: 2
-                  }}
+                  sx={{ width: 220, bgcolor: 'transparent', mr: 2 }}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
-                        <SvgIcon fontSize="small" color="action">
-                          <SearchIcon />
-                        </SvgIcon>
+                        <SvgIcon fontSize="small" color="action"><SearchIcon /></SvgIcon>
                       </InputAdornment>
                     )
                   }}
-                  variant="outlined"
-                  aria-label="Search media"
                 />
 
                 {/* Action Buttons */}
@@ -342,24 +383,12 @@ const MediaList = (props) => {
                     <Tooltip title="Select media(s) to delete" arrow>
                       <span>
                         <Button
-                          sx={{
-                            mx: 1,
-                            cursor: 'pointer',
-                            color: 'black',
-                            borderColor: 'error.main',
-                            '&:hover': { backgroundColor: 'rgba(211,47,47,0.08)' },
-                            '& .MuiSvgIcon-root': { color: 'error.main' }
-                          }}
+                          sx={{ mx: 1, color: 'black', borderColor: 'error.main' }}
                           onClick={() => setModal(true)}
                           disabled={selected.length === 0}
                           variant="outlined"
                           color="error"
-                          startIcon={
-                            <SvgIcon fontSize="small">
-                              <Trash2Icon />
-                            </SvgIcon>
-                          }
-                          aria-label="Delete selected media"
+                          startIcon={<SvgIcon fontSize="small"><Trash2Icon /></SvgIcon>}
                         >
                           Delete
                         </Button>
@@ -367,41 +396,27 @@ const MediaList = (props) => {
                     </Tooltip>
                   ) : (
                     <Button
-                      sx={{
-                        mx: 1,
-                        cursor: 'pointer',
-                        color: 'black',
-                        borderColor: 'error.main',
-                        '&:hover': { backgroundColor: 'rgba(211,47,47,0.08)' },
-                        '& .MuiSvgIcon-root': { color: 'error.main' }
-                      }}
+                      sx={{ mx: 1, color: 'black', borderColor: 'error.main' }}
                       onClick={() => setModal(true)}
                       disabled={selected.length === 0}
                       variant="outlined"
                       color="error"
-                      startIcon={
-                        <SvgIcon fontSize="small">
-                          <Trash2Icon />
-                        </SvgIcon>
-                      }
-                      aria-label="Delete selected media"
+                      startIcon={<SvgIcon fontSize="small"><Trash2Icon /></SvgIcon>}
                     >
                       Delete
                     </Button>
                   )}
 
                   <Button variant="contained" onClick={() => navigate('/app/savemedia')}
-                    sx={{ textTransform: 'none', bgcolor: '#5b67d6', fontWeight: 500, px: 3, borderRadius: '6px', boxShadow: 'none', '&:hover': { bgcolor: '#4c5bc6', boxShadow: 'none' } }}>
+                    sx={{ textTransform: 'none', bgcolor: '#5b67d6', fontWeight: 500, px: 3 }}>
                     ADD MEDIA
                   </Button>
-
                   <Button variant="contained" onClick={() => navigate('/app/createmedia')}
-                    sx={{ textTransform: 'none', bgcolor: '#5b67d6', fontWeight: 500, px: 3, borderRadius: '6px', boxShadow: 'none', '&:hover': { bgcolor: '#4c5bc6', boxShadow: 'none' } }}>
+                    sx={{ textTransform: 'none', bgcolor: '#5b67d6', fontWeight: 500, px: 3 }}>
                     CREATE MEDIA
                   </Button>
-
                   <Button variant="contained" onClick={() => navigate('/app/splitmedia')}
-                    sx={{ textTransform: 'none', bgcolor: '#5b67d6', fontWeight: 500, px: 3, borderRadius: '6px', boxShadow: 'none', '&:hover': { bgcolor: '#4c5bc6', boxShadow: 'none' } }}>
+                    sx={{ textTransform: 'none', bgcolor: '#5b67d6', fontWeight: 500, px: 3 }}>
                     CREATE SPLIT SCREEN
                   </Button>
                 </Box>
@@ -411,87 +426,36 @@ const MediaList = (props) => {
 
           {/* Tabs + Grid */}
           <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-            <Box sx={{ width: '100%', maxWidth: 1400, bgcolor: 'transparent', borderRadius: '8px', boxShadow: 'none', overflow: 'hidden' }}>
-              <Box sx={{ borderBottom: 'none', px: 2, pt: 3, display: 'flex', justifyContent: 'center', bgcolor: 'transparent' }}>
+            <Box sx={{ width: '100%', maxWidth: 1400, bgcolor: 'transparent' }}>
+              <Box sx={{ borderBottom: 'none', px: 2, pt: 3, display: 'flex', justifyContent: 'center' }}>
                 <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%' }}>
-                  {/* Tabs kept centered (unchanged visuals) */}
                   <Box sx={{ margin: '0 auto' }}>
-                    <Tabs
-                      value={activeTab}
-                      onChange={handleTabChange}
-                      TabIndicatorProps={{ children: <span className="MuiTabs-indicatorSpan" /> }}
-                      sx={{
-                        minHeight: 48,
-                        position: 'relative',
-                        '& .MuiTabs-flexContainer': { gap: 1, alignItems: 'center' },
-                        '& .MuiButtonBase-root, & .MuiTab-root': {
-                          bgcolor: 'transparent !important',
-                          boxShadow: 'none !important',
-                        },
-                        '& .MuiButtonBase-root.Mui-focusVisible': { bgcolor: 'transparent !important' },
-                        '& .MuiTab-root:focus': { outline: 'none', bgcolor: 'transparent !important' },
-                        '& .MuiTab-root': {
-                          height: 36,
-                          padding: '0 18px',
-                          borderRadius: '999px',
-                          textTransform: 'none',
-                          fontWeight: 600,
-                          fontSize: '14px',
-                          color: '#6b7280',
-                          transition: 'color 200ms ease',
-                          zIndex: 3,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        },
-                        '& .MuiTab-root .MuiTab-wrapper': { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-                        '& .MuiTab-root.Mui-selected': { bgcolor: 'transparent !important', color: '#1976d2', zIndex: 3 },
-                        '& .MuiTabs-indicator': {
-                          position: 'absolute',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          height: 36,
-                          transition: 'left 300ms cubic-bezier(0.4,0,0.2,1), width 300ms cubic-bezier(0.4,0,0.2,1)',
-                          borderRadius: '999px',
-                          zIndex: 2,
-                          backgroundColor: 'transparent',
-                          pointerEvents: 'none'
-                        },
-                        '& .MuiTabs-indicatorSpan': {
-                          display: 'block',
-                          width: '100%',
-                          height: '100%',
-                          backgroundColor: '#e3f2fd',
-                          borderRadius: '999px',
-                          boxShadow: 'none'
-                        }
-                      }}
-                    >
+                    {/* ✅ ADD GIFS TAB */}
+                    <Tabs value={activeTab} onChange={handleTabChange}>
                       <Tab disableRipple label="IMAGES" value="IMAGES" />
                       <Tab disableRipple label="VIDEOS" value="VIDEOS" />
+                      <Tab disableRipple label="GIFS" value="GIFS" />
                     </Tabs>
                   </Box>
 
-                  {/* Select all - extreme right of tabs bar, unchanged placement */}
-                  <Box sx={{ position: 'absolute', right: 8, display: 'flex', alignItems: 'center' }}>
+                  <Box sx={{ position: 'absolute', right: 8 }}>
                     {hasSelection && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', mr: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <Checkbox
                           size="small"
                           checked={allVisibleSelected}
                           indeterminate={someVisibleSelected}
                           onChange={handleSelectAllVisible}
-                          inputProps={{ 'aria-label': 'Select all visible media' }}
                           sx={{ p: 0, mr: 0.5 }}
                         />
-                        <Typography variant="body2" sx={{ userSelect: 'none' }}>Select all</Typography>
+                        <Typography variant="body2">Select all</Typography>
                       </Box>
                     )}
                   </Box>
                 </Box>
-               </Box>
+              </Box>
 
-              <Box sx={{ p: 3, maxHeight: 'calc(100vh - 280px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', bgcolor: '#fff', borderRadius: '0 0 8px 8px' }}>
+              <Box sx={{ p: 3, maxHeight: 'calc(100vh - 280px)', overflowY: 'auto', bgcolor: '#fff' }}>
                 {!mediaItem || mediaItem.length === 0 ? (
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
                     <Typography variant="body1" color="text.secondary">No media found</Typography>
@@ -503,22 +467,19 @@ const MediaList = (props) => {
                 )}
               </Box>
 
-              {/* pagination placed just below the media grid (outside the scrollable area) */}
-              {totalPages > 0 && (
-                <Box sx={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  gap: 2,
-                  mt: 1,
-                  mb: 2,
-                  // lift it a bit up so it doesn't get clipped by the viewport/footer
-                  transform: 'translateY(-8px)',
-                  zIndex: 2
-                }}>
-                  <Pagination count={totalPages} page={currentPage} onChange={handlePageChange} color="primary" size="medium" showFirstButton showLastButton />
+              {/* ✅ TAB-SPECIFIC PAGINATION */}
+              {getCurrentTotalPages() > 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, mt: 1, mb: 2 }}>
+                  <Pagination 
+                    count={getCurrentTotalPages()} 
+                    page={getCurrentPage()} 
+                    onChange={handlePageChange} 
+                    color="primary" 
+                    showFirstButton 
+                    showLastButton 
+                  />
                   <Typography variant="body2" color="text.secondary">
-                    {totalRecords} {activeTab === 'IMAGES' ? 'images' : activeTab === 'VIDEOS' ? 'videos' : 'gifs'}
+                    {getCurrentTotalRecords()} {activeTab === 'IMAGES' ? 'images' : activeTab === 'VIDEOS' ? 'videos' : 'gifs'}
                   </Typography>
                 </Box>
               )}
