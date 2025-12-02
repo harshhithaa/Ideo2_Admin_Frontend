@@ -8,14 +8,37 @@ import { Formik } from 'formik';
 import React, { useState, useEffect } from 'react';
 import CardMedia from '@mui/material/CardMedia';
 import { Alert, Stack, Checkbox, Snackbar } from '@mui/material';
-import { Box, Button, Container, TextField, Typography, Grid, MenuItem, Select, FormControl, InputLabel, IconButton } from '@mui/material';
+import { Box, Button, Container, TextField, Typography, Grid, MenuItem, Select, FormControl, InputLabel, IconButton, Tooltip } from '@mui/material';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
+import LockIcon from '@mui/icons-material/Lock';
 import { connect } from 'react-redux';
 import { COMPONENTS } from 'src/utils/constant.jsx';
 import MediaGrid from 'src/components/media/MediaGrid';
 import { getUserComponentListWithPagination, savePlaylist } from '../store/action/user';
+
+const VideoThumbnail = ({ videoUrl, alt }) => {
+  const videoRef = React.useRef(null);
+
+  return (
+    <Box sx={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+      <video
+        ref={videoRef}
+        src={videoUrl}
+        preload="metadata"
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          display: 'block'
+        }}
+        muted
+        playsInline
+      />
+    </Box>
+  );
+};
 
 const CreatePlaylist = (props) => {
   const navigate = useNavigate();
@@ -108,7 +131,8 @@ const CreatePlaylist = (props) => {
       MediaRef: item.MediaRef,
       MediaName: item.MediaName || item.fileName || item.FileName || item.Name || item.name || item.Title || item.title || 'Unknown Media',
       MediaPath: item.MediaPath || item.fileUrl || item.FileUrl || item.FileURL || item.url || '',
-      Thumbnail: item.Thumbnail || item.thumbnailUrl || item.ThumbnailUrl || item.posterFrame || item.MediaPath || item.fileUrl || '',
+      // ✅ ENSURE THUMBNAIL IS PROPERLY EXTRACTED FOR VIDEOS
+      Thumbnail: item.Thumbnail || item.thumbnailUrl || item.ThumbnailUrl || item.posterFrame || item.Poster || item.MediaThumb || (item.MediaType?.toLowerCase().includes('video') ? item.MediaPath : item.MediaPath) || item.fileUrl || '',
       MediaType: item.MediaType || item.FileType || item.fileMimetype || item.FileMimetype || 'unknown',
       FileMimetype: item.fileMimetype || item.FileMimetype || item.FileType || item.MediaType || '',
       DurationSeconds: item.DurationSeconds || item.durationSeconds || item.Duration || null
@@ -468,11 +492,11 @@ const CreatePlaylist = (props) => {
 
                         {durationMode === 'Default' && (
                           <FormControl fullWidth size="small" margin="dense">
-                            <InputLabel id="default-duration-label">Default (images)</InputLabel>
+                            <InputLabel id="default-duration-label">Default Duration</InputLabel>
                             <Select
                               labelId="default-duration-label"
                               value={defaultDuration}
-                              label="Default (images)"
+                              label="Default duration"
                               onChange={(e) => setDefaultDuration(Number(e.target.value))}
                               sx={{ mt: 0.5 }}
                             >
@@ -551,18 +575,20 @@ const CreatePlaylist = (props) => {
                   {/* Selection summary / badges with duration controls */}
                   <Box sx={{ mt: 1, mb: 1 }}>
                     <Typography variant="h6" sx={{ mb: 1 }}>Selected items ({playlistMedia.length})</Typography>
-                    <Grid container spacing={1}>
+                    <Grid container spacing={1.5}>
                       {playlistMedia.map((p, idx) => {
-                        // FIXED: Media metadata is already stored in the playlist item
                         const mediaName = p.MediaName || 'Unknown Media';
-                        const thumbnailUrl = p.Thumbnail || p.MediaPath || '';
                         const isVideo = isVideoRef(p.MediaRef);
+                        const thumbnailUrl = p.Thumbnail || p.MediaPath || '';
 
                         return (
                           <Grid item xs={12} md={6} key={p.SelectionId}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, border: `1px solid ${cardBorder}`, p: 1, borderRadius: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, border: `1px solid ${cardBorder}`, p: 1, borderRadius: 1 }}>
+                              {/* ✅ FIXED: Show video poster using the same method as MediaGrid */}
                               <Box sx={{ width: 56, height: 56, borderRadius: 1, overflow: 'hidden', background: '#f9f9f9', flexShrink: 0 }}>
-                                {thumbnailUrl ? (
+                                {isVideo ? (
+                                  <VideoThumbnail videoUrl={p.MediaPath || thumbnailUrl} alt={mediaName} />
+                                ) : thumbnailUrl ? (
                                   <CardMedia 
                                     component="img" 
                                     image={thumbnailUrl} 
@@ -570,8 +596,17 @@ const CreatePlaylist = (props) => {
                                     sx={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                                   />
                                 ) : (
-                                  <Box sx={{ width: '100%', height: '100%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Typography variant="caption" sx={{ color: '#999', fontSize: '10px' }}>?</Typography>
+                                  <Box sx={{ 
+                                    width: '100%', 
+                                    height: '100%', 
+                                    background: '#eee', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center' 
+                                  }}>
+                                    <Typography variant="caption" sx={{ color: '#999', fontSize: '10px', fontWeight: 600 }}>
+                                      ?
+                                    </Typography>
                                   </Box>
                                 )}
                               </Box>
@@ -587,16 +622,43 @@ const CreatePlaylist = (props) => {
 
                               {/* duration controls (images only) */}
                               {!isVideo ? (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
-                                  <IconButton size="small" onClick={() => adjustDuration(p.MediaRef, -1)}><RemoveIcon fontSize="small" /></IconButton>
-                                  <TextField
-                                    size="small"
-                                    value={p.Duration === '' ? '' : (p.Duration || 10)}
-                                    onChange={(e) => onDurationInputChange(p.MediaRef, e.target.value)}
-                                    onBlur={() => onDurationBlur(p.MediaRef)}
-                                    inputProps={{ style: { width: 44, textAlign: 'center' } }}
-                                  />
-                                  <IconButton size="small" onClick={() => adjustDuration(p.MediaRef, +1)}><AddIcon fontSize="small" /></IconButton>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                                  {durationMode === 'Default' ? (
+                                    <>
+                                      {/* Default mode: only show locked duration + lock icon */}
+                                      <TextField
+                                        size="small"
+                                        value={Number(defaultDuration)}
+                                        inputProps={{ style: { width: 44, textAlign: 'center' }, readOnly: true }}
+                                        disabled
+                                      />
+
+                                      <Tooltip title="Uses the selected default duration" arrow>
+                                        <Box sx={{ ml: 0.5, color: 'text.secondary', display: 'flex', alignItems: 'center' }}>
+                                          <LockIcon fontSize="small" />
+                                        </Box>
+                                      </Tooltip>
+                                    </>
+                                  ) : (
+                                    <>
+                                      {/* Custom mode — fully editable with +/- */}
+                                      <IconButton size="small" onClick={() => adjustDuration(p.MediaRef, -1)}>
+                                        <RemoveIcon fontSize="small" />
+                                      </IconButton>
+
+                                      <TextField
+                                        size="small"
+                                        value={p.Duration === '' ? '' : (p.Duration || 10)}
+                                        onChange={(e) => onDurationInputChange(p.MediaRef, e.target.value)}
+                                        onBlur={() => onDurationBlur(p.MediaRef)}
+                                        inputProps={{ style: { width: 44, textAlign: 'center' } }}
+                                      />
+
+                                      <IconButton size="small" onClick={() => adjustDuration(p.MediaRef, +1)}>
+                                        <AddIcon fontSize="small" />
+                                      </IconButton>
+                                    </>
+                                  )}
                                 </Box>
                               ) : (
                                 <Typography variant="body2" sx={{ color: 'text.secondary', mr: 1, flexShrink: 0 }}>Plays full video</Typography>

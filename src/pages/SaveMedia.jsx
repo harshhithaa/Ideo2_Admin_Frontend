@@ -67,7 +67,6 @@ const thumb = {
 const thumbInner = { display: 'flex', minWidth: 0, overflow: 'hidden', width: '100%', alignItems: 'center', justifyContent: 'center' };
 const imgStyle = { display: 'block', width: 'auto', height: '100%' };
 
-/* create a poster (object URL) for a video file by drawing a frame to canvas */
 const generateVideoThumbnail = (file) =>
   new Promise((resolve) => {
     try {
@@ -144,8 +143,9 @@ function SaveMedia(props) {
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
-  // new ref to mark when we've handled 100% locally to avoid delay / duplicate handling
   const uploadedLocallyRef = useRef(false);
+  // ✅ Store uploaded media type to pass to Media List
+  const uploadedMediaTypeRef = useRef(null);
 
   const {
     getRootProps,
@@ -202,7 +202,6 @@ function SaveMedia(props) {
 
   useEffect(() => {
     return () => {
-      // cleanup object URLs on unmount
       files.forEach((f) => {
         try { if (f.preview) URL.revokeObjectURL(f.preview); } catch (e) {}
         try { if (f.originalPreview) URL.revokeObjectURL(f.originalPreview); } catch (e) {}
@@ -263,45 +262,43 @@ function SaveMedia(props) {
 
   const inputProps = getInputProps();
 
-  // helper to go to Media list and close dialog
+  // ✅ Helper to determine media type from uploaded files
+  const determineUploadedMediaType = () => {
+    if (!files || files.length === 0) return null;
+
+    // Check first file to determine type
+    const firstFile = files[0];
+    const type = (firstFile.type || '').toLowerCase();
+    const name = (firstFile.name || '').toLowerCase();
+
+    // Check for GIF
+    if (type === 'image/gif' || type.includes('gif') || name.endsWith('.gif')) {
+      return 'GIFS';
+    }
+
+    // Check for video
+    if (type.startsWith('video/') || name.match(/\.(mp4|webm|ogg|mov)$/)) {
+      return 'VIDEOS';
+    }
+
+    // Default to images
+    return 'IMAGES';
+  };
+
+  // ✅ Navigate to Media Library with correct tab
   const goToMediaLibrary = () => {
     setOpenSnackbar(false);
 
-    // 1) Try to find an in-app link (sidebar/menu) that already points to Media and follow it.
-    //    This is robust across apps using different base paths (SPA or hash router).
-    const anchor =
-      document.querySelector('a[href*="/media"]') ||
-      document.querySelector('a[href*="#/media"]') ||
-      document.querySelector('a[href*="media"]');
+    // Get the media type that was uploaded
+    const targetTab = uploadedMediaTypeRef.current || 'IMAGES';
 
-    if (anchor) {
-      const href = anchor.getAttribute('href') || '';
-      if (href.startsWith('#')) {
-        // hash route
-        window.location.hash = href.replace(/^#/, '');
-        return;
-      }
-      if (href.startsWith('/')) {
-        // SPA route — use router navigation
-        navigate(href);
-        return;
-      }
-      // fallback to full href
-      window.location.href = href;
-      return;
-    }
-
-    // 2) Fallback: try common routes. Use navigate() first (SPA). If your app uses hash routing,
-    //    uncomment the hash fallback below.
-    try {
-      navigate('/media');
-      return;
-    } catch (e) {
-      // nothing
-    }
-
-    // last resort: attempt hash-based navigation
-    window.location.href = `${window.location.origin}/#/media`;
+    // Navigate with state to tell Media List which tab to open
+    navigate('/app/media', { 
+      state: { 
+        openTab: targetTab,
+        fromUpload: true 
+      } 
+    });
   };
 
   function saveMediaData() {
@@ -312,31 +309,30 @@ function SaveMedia(props) {
       return;
     }
 
+    // ✅ Determine and store media type before upload
+    uploadedMediaTypeRef.current = determineUploadedMediaType();
+
     const formdata = new FormData();
     files.forEach((f) => formdata.append('Media', f.file));
 
     setUploading(true);
     setUploadProgress(0);
-    uploadedLocallyRef.current = false; // reset flag before upload
+    uploadedLocallyRef.current = false;
 
     props.saveMedia(formdata, (err, progressEvent) => {
-      // progress events come here while uploading
       if (progressEvent) {
         const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
         setUploadProgress(percent);
 
-        // Immediately treat 100% as uploaded for UI responsiveness
         if (percent === 100 && !uploadedLocallyRef.current) {
           uploadedLocallyRef.current = true;
 
-          // Immediate success UI
           setUploading(false);
           setUploadProgress(100);
           setSnackSeverity('success');
           setSnackMessage('Media uploaded successfully. View it in Media Library.');
           setOpenSnackbar(true);
 
-          // cleanup previews and clear selection
           files.forEach((f) => {
             try { if (f.preview) URL.revokeObjectURL(f.preview); } catch (e) {}
             try { if (f.originalPreview) URL.revokeObjectURL(f.originalPreview); } catch (e) {}
@@ -347,16 +343,11 @@ function SaveMedia(props) {
         return;
       }
 
-      // final server callback (error or final success)
-      // If we already handled 100% locally, just clear the flag and return
       if (uploadedLocallyRef.current) {
         uploadedLocallyRef.current = false;
-        // final server validation could still report errors; if you want to react to server errors here,
-        // add logic to show error snackbar if err exists. Currently we assume server will confirm soon.
         return;
       }
 
-      // If no local 100% handling (edge cases), handle final result here
       setUploading(false);
       setUploadProgress(0);
 
@@ -382,7 +373,6 @@ function SaveMedia(props) {
     <Grid container direction="column" sx={{ minHeight: '100vh', alignItems: 'center', justifyContent: 'center' }}>
       <Helmet><title>Add Media | Ideogram</title></Helmet>
 
-      {/* Centered result dialog (success / error). Contains optional action to go to Media Library */}
       <Dialog
         open={openSnackbar}
         onClose={() => setOpenSnackbar(false)}
@@ -412,7 +402,6 @@ function SaveMedia(props) {
         <div {...getRootProps({ style })}>
           <input {...inputProps} ref={inputRef} />
 
-          {/* center choose button when no files */}
           {files.length === 0 && (
             <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 1, mb: 1 }}>
               <Button
@@ -435,7 +424,6 @@ function SaveMedia(props) {
 
           <p style={{ color: '#9e9e9e', textAlign: 'center' }}>Drag and Drop your media here, or click to select</p>
 
-          {/* choose button above thumbnails when files exist */}
           {files.length > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
               <Button

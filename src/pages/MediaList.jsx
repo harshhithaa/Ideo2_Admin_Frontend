@@ -29,18 +29,55 @@ import {
   validateDeleteComponentList,
   deleteComponentList
 } from '../store/action/user';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, useNavigationType } from 'react-router-dom';
+
+const ACTIVE_TAB_KEY = 'mediaList_activeTab';
 
 const MediaList = (props) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  // detect navigation kind to decide whether this load is a "fresh navigation" or a refresh/back
+  const navigationType = useNavigationType();
+
+  // ✅ CHECK FOR NAVIGATION STATE (from upload) BEFORE LOCALSTORAGE / PUSH handling
+  const getInitialTab = () => {
+    // Priority 1: Check if navigated from upload with a specific tab
+    if (location.state?.openTab && location.state?.fromUpload) {
+      const requestedTab = location.state.openTab;
+      if (['IMAGES', 'VIDEOS', 'GIFS'].includes(requestedTab)) {
+        return requestedTab;
+      }
+    }
+
+    // Priority 2: If this load is a PUSH (user clicked a link from another page), treat as fresh navigation -> default to IMAGES
+    // This ensures Dashboard/Playlist/etc. links always open IMAGES
+    if (navigationType === 'PUSH') {
+      return 'IMAGES';
+    }
+
+    // Priority 3: For non-PUSH (refresh/back), restore from localStorage if available
+    try {
+      const saved = localStorage.getItem(ACTIVE_TAB_KEY);
+      if (saved && ['IMAGES', 'VIDEOS', 'GIFS'].includes(saved)) {
+        return saved;
+      }
+    } catch (e) {
+      console.error('Error reading active tab from localStorage:', e);
+    }
+
+    // Default fallback
+    return 'IMAGES';
+  };
+
   const [mediaItem, setMedia] = useState([]);
   const [selected, setselected] = useState([]);
   const [showmodal, setModal] = useState(false);
   const [showErrModal, setErrModal] = useState(false);
   const [playlists, setPlaylists] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('IMAGES');
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+  const [prevActiveTab, setPrevActiveTab] = useState(null);
 
-  // ✅ SEPARATE STATE FOR EACH TAB
   const [imagePage, setImagePage] = useState(1);
   const [videoPage, setVideoPage] = useState(1);
   const [gifPage, setGifPage] = useState(1);
@@ -60,7 +97,22 @@ const MediaList = (props) => {
   const [boxMessage, setboxMessage] = useState('');
   const [color, setcolor] = useState('success');
 
-  const navigate = useNavigate();
+  // ✅ CLEAR NAVIGATION STATE AFTER READING IT (only when coming from upload)
+  useEffect(() => {
+    if (location.state?.fromUpload) {
+      // Clear the navigation state to prevent tab switching on subsequent visits
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
+
+  // ✅ PERSIST ACTIVE TAB TO LOCALSTORAGE WHENEVER IT CHANGES (used for refresh/back)
+  useEffect(() => {
+    try {
+      localStorage.setItem(ACTIVE_TAB_KEY, activeTab);
+    } catch (e) {
+      console.error('Error saving active tab to localStorage:', e);
+    }
+  }, [activeTab]);
 
   // ✅ GET CURRENT PAGE AND TOTALS BASED ON ACTIVE TAB
   const getCurrentPage = () => {
@@ -98,7 +150,8 @@ const MediaList = (props) => {
   };
 
   // ✅ UNIFIED FETCH FUNCTION WITH TAB-SPECIFIC STATE
-  const fetchMediaList = async (page, mediaType, search = searchQuery) => {
+  // Options: { setDisplay: boolean } - when true, update mediaItem to returned list
+  const fetchMediaList = async (page, mediaType, search = searchQuery, options = {}) => {
     setLoading(true);
 
     const requestData = {
@@ -116,7 +169,7 @@ const MediaList = (props) => {
         setLoading(false);
 
         if (!res || res.exists) {
-          setMedia([]);
+          // clear totals for this mediaType
           if (mediaType === 'image') {
             setImageTotalRecords(0);
             setImageTotalPages(0);
@@ -127,18 +180,19 @@ const MediaList = (props) => {
             setGifTotalRecords(0);
             setGifTotalPages(0);
           }
-          resolve();
+
+          if (options.setDisplay) setMedia([]);
+          resolve({ componentList: [], totalRecords: 0, mediaType });
           return;
         }
 
         const data = res.data || {};
         const componentList = data.ComponentList || [];
-        const totalRecords = componentList.length > 0 && componentList[0].TotalRecords 
-          ? Number(componentList[0].TotalRecords) 
+        const totalRecords = componentList.length > 0 && componentList[0].TotalRecords
+          ? Number(componentList[0].TotalRecords)
           : (data.TotalRecords || 0);
 
-        setMedia(componentList);
-
+        // Update per-tab totals/pages (used for badges and pagination)
         if (mediaType === 'image') {
           setImageTotalRecords(totalRecords);
           setImageTotalPages(Math.ceil(totalRecords / pageSize));
@@ -150,51 +204,113 @@ const MediaList = (props) => {
           setGifTotalPages(Math.ceil(totalRecords / pageSize));
         }
 
-        resolve();
+        // Only update displayed media if explicitly requested
+        if (options.setDisplay) {
+          setMedia(componentList);
+        }
+
+        resolve({ componentList, totalRecords, mediaType });
       });
     });
   };
 
-  // ✅ INITIAL LOAD - IMAGES TAB
+  // ✅ INITIAL LOAD - FETCH FOR RESTORED ACTIVE TAB
   useEffect(() => {
-    fetchMediaList(1, 'image', '');
+    let mediaType = '';
+    if (activeTab === 'IMAGES') mediaType = 'image';
+    else if (activeTab === 'VIDEOS') mediaType = 'video';
+    else if (activeTab === 'GIFS') mediaType = 'gif';
+
+    fetchMediaList(1, mediaType, '', { setDisplay: true });
   }, []);
 
-  // ✅ REFETCH WHEN TAB CHANGES
+  // ✅ REFETCH WHEN TAB CHANGES -> display for that tab
   useEffect(() => {
     let mediaType = '';
     if (activeTab === 'IMAGES') mediaType = 'image';
     else if (activeTab === 'VIDEOS') mediaType = 'video';
     else if (activeTab === 'GIFS') mediaType = 'gif';
 
-    fetchMediaList(getCurrentPage(), mediaType, searchQuery);
+    // when switching tab normally, show results for that tab
+    fetchMediaList(getCurrentPage(), mediaType, searchQuery, { setDisplay: true });
+    // clear selection when tab changes
+    setselected([]);
   }, [activeTab]);
 
-  // ✅ REFETCH WHEN PAGE CHANGES
+  // ✅ REFETCH WHEN PAGE CHANGES -> display for current tab
   useEffect(() => {
     let mediaType = '';
     if (activeTab === 'IMAGES') mediaType = 'image';
     else if (activeTab === 'VIDEOS') mediaType = 'video';
     else if (activeTab === 'GIFS') mediaType = 'gif';
 
-    fetchMediaList(getCurrentPage(), mediaType, searchQuery);
+    fetchMediaList(getCurrentPage(), mediaType, searchQuery, { setDisplay: true });
   }, [imagePage, videoPage, gifPage]);
 
-  // ✅ HANDLE SEARCH
-  const handleSearch = (query) => {
-    setSearchQuery(query);
-    let mediaType = '';
-    if (activeTab === 'IMAGES') {
-      mediaType = 'image';
-      setImagePage(1);
-    } else if (activeTab === 'VIDEOS') {
-      mediaType = 'video';
-      setVideoPage(1);
-    } else if (activeTab === 'GIFS') {
-      mediaType = 'gif';
-      setGifPage(1);
+  // ✅ HANDLE GLOBAL SEARCH
+  const handleSearch = async (query) => {
+    // save/restore previous active tab when search begins/ends
+    const trimmed = String(query || '').trim();
+    if (trimmed && !searchQuery) {
+      setPrevActiveTab(activeTab);
     }
-    fetchMediaList(1, mediaType, query);
+
+    setSearchQuery(trimmed);
+
+    // if search cleared -> restore previous tab (or default) and fetch
+    if (!trimmed) {
+      const restoreTab = prevActiveTab || 'IMAGES';
+      setActiveTab(restoreTab);
+      // ensure we fetch data for restored tab and display it
+      let mediaType = restoreTab === 'IMAGES' ? 'image' : restoreTab === 'VIDEOS' ? 'video' : 'gif';
+      // set page to 1 for restored tab
+      if (restoreTab === 'IMAGES') setImagePage(1);
+      if (restoreTab === 'VIDEOS') setVideoPage(1);
+      if (restoreTab === 'GIFS') setGifPage(1);
+      await fetchMediaList(1, mediaType, '', { setDisplay: true });
+      setPrevActiveTab(null);
+      return;
+    }
+
+    // run search across all three tabs concurrently (page 1)
+    const [imgRes, vidRes, gifRes] = await Promise.all([
+      fetchMediaList(1, 'image', trimmed, { setDisplay: false }),
+      fetchMediaList(1, 'video', trimmed, { setDisplay: false }),
+      fetchMediaList(1, 'gif', trimmed, { setDisplay: false })
+    ]);
+
+    // decide which tab to show: priority Images -> Videos -> GIFs when any matches;
+    // fallback to highest match count if multiple match; otherwise don't change tab (keep prev)
+    const imgCount = imgRes?.totalRecords || 0;
+    const vidCount = vidRes?.totalRecords || 0;
+    const gifCount = gifRes?.totalRecords || 0;
+
+    let targetTab = null;
+
+    if (imgCount > 0) targetTab = 'IMAGES';
+    else if (vidCount > 0) targetTab = 'VIDEOS';
+    else if (gifCount > 0) targetTab = 'GIFS';
+
+    // If multiple tabs have matches, choose priority above; (alternative: pick highest count)
+    if (!targetTab) {
+      // no matches in any tab -> clear displayed results (show "No matches found")
+      setMedia([]);
+      // keep user on previous tab (do not switch) - prevActiveTab was saved earlier
+      return;
+    }
+
+    // switch to target tab and display its componentList
+    setActiveTab(targetTab);
+    setselected([]);
+    // reset page for that tab to 1
+    if (targetTab === 'IMAGES') setImagePage(1);
+    if (targetTab === 'VIDEOS') setVideoPage(1);
+    if (targetTab === 'GIFS') setGifPage(1);
+
+    // display the results for the chosen tab
+    if (targetTab === 'IMAGES') setMedia(imgRes.componentList || []);
+    if (targetTab === 'VIDEOS') setMedia(vidRes.componentList || []);
+    if (targetTab === 'GIFS') setMedia(gifRes.componentList || []);
   };
 
   // ✅ HANDLE TAB CHANGE
@@ -233,7 +349,7 @@ const MediaList = (props) => {
           else if (activeTab === 'VIDEOS') mediaType = 'video';
           else if (activeTab === 'GIFS') mediaType = 'gif';
           
-          fetchMediaList(getCurrentPage(), mediaType, searchQuery);
+          fetchMediaList(getCurrentPage(), mediaType, searchQuery, { setDisplay: true });
         }
       });
     });
@@ -324,6 +440,12 @@ const MediaList = (props) => {
     }
   };
 
+  // Quick helper to render tab label with optional counts during search
+  const tabLabel = (label, count) => {
+    if (searchQuery) return `${label} (${count || 0})`;
+    return label;
+  };
+
   return (
     <>
       <Helmet><title>Media | Ideogram</title></Helmet>
@@ -366,7 +488,7 @@ const MediaList = (props) => {
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   placeholder="Search Media"
-                  sx={{ width: 220, bgcolor: 'transparent', mr: 2 }}
+                  sx={{ width: 320, bgcolor: 'transparent', mr: 2 }}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -378,7 +500,6 @@ const MediaList = (props) => {
 
                 {/* Action Buttons */}
                 <Box sx={{ display: 'flex', gap: 1.5 }}>
-                  {/* Delete button - identical styling/behavior to ScheduleList delete button */}
                   {!hasSelection ? (
                     <Tooltip title="Select media(s) to delete" arrow>
                       <span>
@@ -430,11 +551,10 @@ const MediaList = (props) => {
               <Box sx={{ borderBottom: 'none', px: 2, pt: 3, display: 'flex', justifyContent: 'center' }}>
                 <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%' }}>
                   <Box sx={{ margin: '0 auto' }}>
-                    {/* ✅ ADD GIFS TAB */}
                     <Tabs value={activeTab} onChange={handleTabChange}>
-                      <Tab disableRipple label="IMAGES" value="IMAGES" />
-                      <Tab disableRipple label="VIDEOS" value="VIDEOS" />
-                      <Tab disableRipple label="GIFS" value="GIFS" />
+                      <Tab disableRipple label={tabLabel('IMAGES', imageTotalRecords)} value="IMAGES" />
+                      <Tab disableRipple label={tabLabel('VIDEOS', videoTotalRecords)} value="VIDEOS" />
+                      <Tab disableRipple label={tabLabel('GIFS', gifTotalRecords)} value="GIFS" />
                     </Tabs>
                   </Box>
 
@@ -456,9 +576,11 @@ const MediaList = (props) => {
               </Box>
 
               <Box sx={{ p: 3, maxHeight: 'calc(100vh - 280px)', overflowY: 'auto', bgcolor: '#fff' }}>
-                {!mediaItem || mediaItem.length === 0 ? (
+                {(!mediaItem || mediaItem.length === 0) ? (
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
-                    <Typography variant="body1" color="text.secondary">No media found</Typography>
+                    <Typography variant="body1" color="text.secondary">
+                      {searchQuery ? 'No matches found' : 'No media found'}
+                    </Typography>
                   </Box>
                 ) : (
                   <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 2 }}>
@@ -467,7 +589,7 @@ const MediaList = (props) => {
                 )}
               </Box>
 
-              {/* ✅ TAB-SPECIFIC PAGINATION */}
+              {/* TAB-SPECIFIC PAGINATION */}
               {getCurrentTotalPages() > 0 && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, mt: 1, mb: 2 }}>
                   <Pagination 
