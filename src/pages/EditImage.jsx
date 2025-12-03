@@ -4,6 +4,7 @@ import { connect } from 'react-redux';
 import { saveMedia } from '../store/action/user';
 import ImageEditor from 'tui-image-editor';
 import 'tui-image-editor/dist/tui-image-editor.css';
+import 'tui-color-picker/dist/tui-color-picker.css';
 import {
   Button,
   Box,
@@ -27,6 +28,17 @@ const EditImage = ({ saveMedia: uploadMedia }) => {
   const navigate = useNavigate();
   const editorRef = useRef(null);
   const editorInstance = useRef(null);
+  // For keeping selected object stable across UI/layout changes
+  const selectedStateRef = useRef({
+    obj: null,
+    normX: 0,
+    normY: 0,
+    scaleX: 1,
+    scaleY: 1,
+    canvasWidth: 0,
+    canvasHeight: 0
+  });
+  const resizeObserverRef = useRef(null);
   const [snack, setSnack] = useState({ open: false, severity: 'success', msg: '' });
   const [mediaName, setMediaName] = useState('');
   const [editedImage, setEditedImage] = useState(null);
@@ -34,12 +46,8 @@ const EditImage = ({ saveMedia: uploadMedia }) => {
   // Layer management
   const [backgroundLayer, setBackgroundLayer] = useState(null);
   const fileInputRef = useRef(null);
+  const autoPickerTriggeredRef = useRef(false);
   
-  // Only show popup if NO image is pre-loaded
-  const incoming = location.state;
-  const hasPreloadedImage = incoming?.src;
-  const [showPopup, setShowPopup] = useState(!hasPreloadedImage);
-
   // Initialize Toast UI Image Editor
   useEffect(() => {
     const incoming = location.state;
@@ -60,6 +68,16 @@ const EditImage = ({ saveMedia: uploadMedia }) => {
             'common.backgroundImage': 'none',
             'common.backgroundColor': '#1e1e1e',
             'common.border': '0px',
+            // ✅ Color picker theme
+            'header.display': 'none',
+            'menu.normalIcon.color': '#8a8a8a',
+            'menu.activeIcon.color': '#555555',
+            'menu.disabledIcon.color': '#434343',
+            'menu.hoverIcon.color': '#e9e9e9',
+            'submenu.backgroundColor': '#1e1e1e',
+            'submenu.partition.color': '#858585',
+            'colorpicker.button.border': '1px solid #1e1e1e',
+            'colorpicker.title.color': '#fff'
           },
           menu: ['crop', 'flip', 'rotate', 'draw', 'shape', 'icon', 'text', 'mask', 'filter'],
           initMenu: '',
@@ -88,126 +106,227 @@ const EditImage = ({ saveMedia: uploadMedia }) => {
 
       editorInstance.current = new ImageEditor(editorRef.current, editorConfig);
       
-      // Hide internal download button and intercept Load button
+      // Stabilizer: keep selected objects static when layout/toolbar changes size
+      const setupCanvasStabilizer = () => {
+        try {
+          const canvas = editorInstance.current._graphics.getCanvas();
+          // initialize stored canvas size
+          selectedStateRef.current.canvasWidth = canvas.getWidth();
+          selectedStateRef.current.canvasHeight = canvas.getHeight();
+          
+          // record normalized position / scale when selection or transform happens
+          canvas.on('object:selected', function(e) {
+            const obj = e.target;
+            if (!obj) return;
+            const cw = canvas.getWidth(), ch = canvas.getHeight();
+            selectedStateRef.current.obj = obj;
+            selectedStateRef.current.normX = obj.left / cw;
+            selectedStateRef.current.normY = obj.top / ch;
+            selectedStateRef.current.scaleX = obj.scaleX;
+            selectedStateRef.current.scaleY = obj.scaleY;
+            selectedStateRef.current.canvasWidth = cw;
+            selectedStateRef.current.canvasHeight = ch;
+          });
+          
+          // keep normalized values updated during moves / scales
+          canvas.on('object:moving', function(e) {
+            const obj = e.target;
+            const cw = canvas.getWidth(), ch = canvas.getHeight();
+            selectedStateRef.current.normX = obj.left / cw;
+            selectedStateRef.current.normY = obj.top / ch;
+            selectedStateRef.current.scaleX = obj.scaleX;
+            selectedStateRef.current.scaleY = obj.scaleY;
+          });
+          canvas.on('object:scaling', function(e) {
+            const obj = e.target;
+            selectedStateRef.current.scaleX = obj.scaleX;
+            selectedStateRef.current.scaleY = obj.scaleY;
+          });
+          
+          // observe container size changes and reapply normalized position/scale
+          resizeObserverRef.current = new ResizeObserver(() => {
+            if (!editorInstance.current) return;
+            const c = editorInstance.current._graphics.getCanvas();
+            const newW = c.getWidth(), newH = c.getHeight();
+            const s = selectedStateRef.current;
+            if (s.obj && s.canvasWidth && s.canvasHeight) {
+              const scaleFactorW = newW / s.canvasWidth;
+              const scaleFactorH = newH / s.canvasHeight;
+              s.obj.set({
+                left: s.normX * newW,
+                top: s.normY * newH,
+                scaleX: s.scaleX * scaleFactorW,
+                scaleY: s.scaleY * scaleFactorH
+              });
+              s.obj.setCoords();
+              c.renderAll();
+              // update stored canvas size for next change
+              s.canvasWidth = newW;
+              s.canvasHeight = newH;
+            }
+          });
+          
+          // observe the editor container for layout changes
+          if (editorRef.current && resizeObserverRef.current) {
+            resizeObserverRef.current.observe(editorRef.current);
+          }
+        } catch (err) {
+          console.warn('Canvas stabilizer setup failed', err);
+        }
+      };
+      
+      // call stabilizer after initialization
+      setupCanvasStabilizer();
+      
+      // Wait for editor to fully initialize
       setTimeout(() => {
         const downloadBtn = document.querySelector('.tui-image-editor-download-btn');
         if (downloadBtn) {
           downloadBtn.style.display = 'none';
         }
 
-        // Intercept the Load button to add images as layers instead of replacing
-        const loadBtn = document.querySelector('.tui-image-editor-load-btn');
-        if (loadBtn) {
-          // Find the hidden file input
+        // ✅ FIXED: Only trigger Load button, DON'T set up custom handler yet
+        if (incoming?.openPicker && !incoming?.src) {
+          const loadBtn = document.querySelector('.tui-image-editor-load-btn');
+          if (loadBtn) {
+            console.log('Auto-triggering Load button for file picker');
+            // Guard: ensure we trigger the load button only once
+            if (!autoPickerTriggeredRef.current) {
+              loadBtn.click(); // triggers Toast UI's built-in load functionality
+              autoPickerTriggeredRef.current = true;
+            } else {
+              console.log('Load button auto-trigger suppressed (already triggered)');
+            }
+            
+            // ✅ Set up custom handler ONLY after Load button finishes (Toast UI handles first load)
+            editorInstance.current.on('addText', () => {}); // Wake up event system
+            editorInstance.current.on('loadImage', function handleFirstLoad() {
+              console.log('First image loaded - now setting up custom handler');
+              setBackgroundLayer(editorInstance.current.toDataURL());
+              
+              // Remove this listener so it doesn't fire again
+              editorInstance.current.off('loadImage', handleFirstLoad);
+              
+              // NOW set up the custom handler for subsequent loads
+              setTimeout(() => {
+                const fileInput = document.querySelector('input[type="file"][accept="image/*"]');
+                if (fileInput) {
+                  fileInputRef.current = fileInput;
+                  setupCustomLayerHandler(fileInput);
+                }
+              }, 300);
+            });
+          }
+        } 
+        // ✅ If there's already a background, set up custom handler immediately
+        else if (incoming?.src) {
           const fileInput = document.querySelector('input[type="file"][accept="image/*"]');
           if (fileInput) {
             fileInputRef.current = fileInput;
-            
-            // Store original handler
-            const originalOnChange = fileInput.onchange;
-            
-            // Override with custom handler
-            fileInput.onchange = function(e) {
-              e.stopPropagation();
-              e.preventDefault();
-              
-              if (e.target.files && e.target.files[0]) {
-                const file = e.target.files[0];
-                const reader = new FileReader();
-                
-                reader.onload = function(event) {
-                  const imageUrl = event.target.result;
-                  
-                  // If background exists, add new image as an Icon/Image object (layer on top)
-                  if (backgroundLayer && editorInstance.current) {
-                    // Create a temporary image to get dimensions
-                    const tempImg = new Image();
-                    tempImg.onload = function() {
-                      // Calculate size (max 50% of canvas)
-                      const canvasSize = editorInstance.current.getCanvasSize();
-                      const maxWidth = canvasSize.width * 0.5;
-                      const maxHeight = canvasSize.height * 0.5;
-                      
-                      const ratio = Math.min(maxWidth / tempImg.width, maxHeight / tempImg.height);
-                      const width = tempImg.width * ratio;
-                      const height = tempImg.height * ratio;
-                      
-                      // Add as icon (which is treated as a movable object layer)
-                      editorInstance.current.addIcon('customIcon', {
-                        left: (canvasSize.width - width) / 2,
-                        top: (canvasSize.height - height) / 2,
-                        fill: 'transparent',
-                        stroke: 'transparent',
-                        strokeWidth: 0,
-                        opacity: 1
-                      }).then(() => {
-                        // Replace the icon with actual image
-                        const canvas = editorInstance.current._graphics.getCanvas();
-                        const objects = canvas.getObjects();
-                        const lastObject = objects[objects.length - 1];
-                        
-                        fabric.Image.fromURL(imageUrl, function(img) {
-                          img.set({
-                            left: (canvasSize.width - width) / 2,
-                            top: (canvasSize.height - height) / 2,
-                            scaleX: width / img.width,
-                            scaleY: height / img.height,
-                            selectable: true,
-                            evented: true
-                          });
-                          
-                          canvas.remove(lastObject);
-                          canvas.add(img);
-                          canvas.setActiveObject(img);
-                          canvas.renderAll();
-                          
-                          console.log('Image added as layer on top of background');
-                        });
-                      }).catch(err => {
-                        console.error('Error adding layer:', err);
-                        // Fallback to original behavior
-                        if (originalOnChange) {
-                          originalOnChange.call(fileInput, e);
-                        }
-                      });
-                    };
-                    tempImg.src = imageUrl;
-                  } else {
-                    // No background - load as main image (original behavior)
-                    if (editorInstance.current) {
-                      editorInstance.current.loadImageFromFile(file).then(() => {
-                        setBackgroundLayer(imageUrl);
-                        console.log('Image loaded as background');
-                      });
-                    }
-                  }
-                  
-                  // Reset file input
-                  e.target.value = '';
-                };
-                
-                reader.readAsDataURL(file);
-              }
-              
-              return false;
-            };
-            
-            // Also prevent default click behavior
-            loadBtn.onclick = function(e) {
-              e.preventDefault();
-              fileInput.click();
-              return false;
-            };
+            setupCustomLayerHandler(fileInput);
           }
         }
       }, 500);
     }
+    
+    // ✅ Custom handler function - extracted outside
+    const setupCustomLayerHandler = (fileInput) => {
+      console.log('Setting up custom layer handler');
+      const originalOnChange = fileInput.onchange;
+      
+      fileInput.onchange = function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        
+        if (e.target.files && e.target.files[0]) {
+          const file = e.target.files[0];
+          const reader = new FileReader();
+          
+          reader.onload = function(event) {
+            const imageUrl = event.target.result;
+            
+            // If background exists, add new image as a layer
+            if (backgroundLayer && editorInstance.current) {
+              const tempImg = new Image();
+              tempImg.onload = function() {
+                const canvasSize = editorInstance.current.getCanvasSize();
+                const maxWidth = canvasSize.width * 0.5;
+                const maxHeight = canvasSize.height * 0.5;
+                
+                const ratio = Math.min(maxWidth / tempImg.width, maxHeight / tempImg.height);
+                const width = tempImg.width * ratio;
+                const height = tempImg.height * ratio;
+                
+                editorInstance.current.addIcon('customIcon', {
+                  left: (canvasSize.width - width) / 2,
+                  top: (canvasSize.height - height) / 2,
+                  fill: 'transparent',
+                  stroke: 'transparent',
+                  strokeWidth: 0,
+                  opacity: 1
+                }).then(() => {
+                  const canvas = editorInstance.current._graphics.getCanvas();
+                  const objects = canvas.getObjects();
+                  const lastObject = objects[objects.length - 1];
+                  
+                  fabric.Image.fromURL(imageUrl, function(img) {
+                    img.set({
+                      left: (canvasSize.width - width) / 2,
+                      top: (canvasSize.height - height) / 2,
+                      scaleX: width / img.width,
+                      scaleY: height / img.height,
+                      selectable: true,
+                      evented: true
+                    });
+                    
+                    canvas.remove(lastObject);
+                    canvas.add(img);
+                    canvas.setActiveObject(img);
+                    canvas.renderAll();
+                    
+                    console.log('Image added as layer');
+                  });
+                }).catch(err => {
+                  console.error('Error adding layer:', err);
+                  if (originalOnChange) {
+                    originalOnChange.call(fileInput, e);
+                  }
+                });
+              };
+              tempImg.src = imageUrl;
+            } else {
+              // No background - load as main image
+              if (editorInstance.current) {
+                editorInstance.current.loadImageFromFile(file).then(() => {
+                  setBackgroundLayer(imageUrl);
+                  console.log('Image loaded as background');
+                });
+              }
+            }
+            
+            // Reset file input
+            e.target.value = '';
+          };
+          
+          reader.readAsDataURL(file);
+        }
+        
+        return false;
+      };
+    };
 
     // Cleanup on unmount
     return () => {
       if (editorInstance.current) {
+        editorInstance.current.off('loadImage');
         editorInstance.current.destroy();
         editorInstance.current = null;
+      }
+      if (resizeObserverRef.current) {
+        try {
+          resizeObserverRef.current.disconnect();
+        } catch (e) {}
+        resizeObserverRef.current = null;
       }
     };
   }, [location.state, backgroundLayer]);
@@ -345,80 +464,37 @@ const EditImage = ({ saveMedia: uploadMedia }) => {
       <Box
         sx={{
           width: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'stretch',
-          justifyContent: 'stretch',
-          height: 'calc(100vh - 100px)',
-          maxHeight: 'calc(100vh - 100px)',
-          p: 2,
-          boxSizing: 'border-box',
-          bgcolor: '#1e1e1e',
-          overflow: 'hidden',
-          '& .tui-image-editor': {
-            height: '100% !important',
-            display: 'flex',
-            flexDirection: 'column'
-          },
-          '& .tui-image-editor-canvas-container': {
-            height: '100% !important',
-            overflow: 'hidden !important'
-          },
-          '& .tui-image-editor-wrap': {
-            height: '100% !important'
-          },
-          position: 'relative'
-        }}
-      >
-        {/* Small centered popup overlay */}
-        {showPopup && (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              pointerEvents: 'none',
-              zIndex: 10000
-            }}
-            aria-hidden={!showPopup}
-          >
-            <div
-              role="dialog"
-              aria-modal="false"
-              style={{
-                pointerEvents: 'auto',
-                background: 'rgba(233, 214, 214, 0.84)',
-                color: '#000000ff',
-                padding: '12px 16px',
-                borderRadius: 8,
-                textAlign: 'center',
-                minWidth: 220,
-                boxShadow: '0 6px 20px rgba(0,0,0,0.4)'
-              }}
-            >
-              <div style={{ fontSize: 14, marginBottom: 8 }}>Load image to start editing</div>
-              <Button
-                size="small"
-                variant="contained"
-                onClick={() => setShowPopup(false)}
-                sx={{
-                  backgroundColor: '#525DDC',
-                  color: '#ffffffff',
-                  textTransform: 'none',
-                  fontSize: 12,
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  '&:hover': { backgroundColor: '#3b5998' }
-                }}
-              >
-                OK
-              </Button>
-            </div>
-          </div>
-        )}
-
+           display: 'flex',
+           flexDirection: 'column',
+           alignItems: 'stretch',
+           justifyContent: 'stretch',
+           height: 'calc(100vh - 100px)',
+           maxHeight: 'calc(100vh - 100px)',
+           p: 2,
+           boxSizing: 'border-box',
+           bgcolor: '#1e1e1e',
+           overflow: 'hidden',
+           '& .tui-image-editor': {
+             height: '100% !important',
+             display: 'flex',
+             flexDirection: 'column'
+           },
+           '& .tui-image-editor-canvas-container': {
+             height: '100% !important',
+             overflow: 'hidden !important'
+           },
+           '& .tui-image-editor-wrap': {
+             height: '100% !important',
+             overflow: 'hidden !important' /* remove internal scroller */
+           },
+           /* Prevent internal menus/submenus from creating scrollbars */
+           '& .tui-image-editor-main, & .tui-image-editor-menu-wrap, & .tui-image-editor-submenu, & .tui-image-editor-header': {
+             overflow: 'visible !important',
+             maxHeight: 'none !important'
+           },
+           position: 'relative'
+         }}
+       >
         {/* Download button */}
         <Button 
           color="primary" 
