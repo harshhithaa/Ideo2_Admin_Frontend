@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable linebreak-style */
 /* eslint-disable react/prop-types */
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   Box,
@@ -29,9 +29,15 @@ import {
   validateDeleteComponentList,
   deleteComponentList
 } from '../store/action/user';
-import { useNavigate, useLocation, useNavigationType } from 'react-router-dom';
+import { useNavigate, useLocation, useNavigationType } from "react-router-dom";
+// replace aliased imports with relative paths
+import Api from "../service/Api";
 
 const ACTIVE_TAB_KEY = 'mediaList_activeTab';
+
+const UPLOADED_MEDIA_KEY = 'IDEOGRAM_UPLOADED_MEDIA';
+const POLL_INTERVAL_MS = 3000;
+const POLL_MAX_ATTEMPTS = 20;
 
 const MediaList = (props) => {
   const location = useLocation();
@@ -153,7 +159,6 @@ const MediaList = (props) => {
   // Options: { setDisplay: boolean } - when true, update mediaItem to returned list
   const fetchMediaList = async (page, mediaType, search = searchQuery, options = {}) => {
     setLoading(true);
-
     const requestData = {
       componenttype: 1,
       searchText: search || '',
@@ -167,21 +172,19 @@ const MediaList = (props) => {
     return new Promise((resolve) => {
       props.getUserComponentListWithPagination(requestData, (res) => {
         setLoading(false);
-
         if (!res || res.exists) {
           // clear totals for this mediaType
-          if (mediaType === 'image') {
-            setImageTotalRecords(0);
-            setImageTotalPages(0);
-          } else if (mediaType === 'video') {
-            setVideoTotalRecords(0);
-            setVideoTotalPages(0);
-          } else if (mediaType === 'gif') {
-            setGifTotalRecords(0);
-            setGifTotalPages(0);
-          }
+          if (mediaType === 'image') { setImageTotalRecords(0); setImageTotalPages(0); }
+          else if (mediaType === 'video') { setVideoTotalRecords(0); setVideoTotalPages(0); }
+          else if (mediaType === 'gif') { setGifTotalRecords(0); setGifTotalPages(0); }
 
-          if (options.setDisplay) setMedia([]);
+          setMedia((prev) => {
+            // keep placeholders on top if any
+            const placeholders = placeholdersRef.current || [];
+            const serverList = [];
+            return [...placeholders, ...serverList];
+          });
+
           resolve({ componentList: [], totalRecords: 0, mediaType });
           return;
         }
@@ -192,24 +195,18 @@ const MediaList = (props) => {
           ? Number(componentList[0].TotalRecords)
           : (data.TotalRecords || 0);
 
-        // Update per-tab totals/pages (used for badges and pagination)
-        if (mediaType === 'image') {
-          setImageTotalRecords(totalRecords);
-          setImageTotalPages(Math.ceil(totalRecords / pageSize));
-        } else if (mediaType === 'video') {
-          setVideoTotalRecords(totalRecords);
-          setVideoTotalPages(Math.ceil(totalRecords / pageSize));
-        } else if (mediaType === 'gif') {
-          setGifTotalRecords(totalRecords);
-          setGifTotalPages(Math.ceil(totalRecords / pageSize));
-        }
+        if (mediaType === 'image') { setImageTotalRecords(totalRecords); setImageTotalPages(Math.ceil(totalRecords / pageSize)); }
+        else if (mediaType === 'video') { setVideoTotalRecords(totalRecords); setVideoTotalPages(Math.ceil(totalRecords / pageSize)); }
+        else if (mediaType === 'gif') { setGifTotalRecords(totalRecords); setGifTotalPages(Math.ceil(totalRecords / pageSize)); }
 
-        // Only update displayed media if explicitly requested
-        if (options.setDisplay) {
-          setMedia(componentList);
-        }
+        // Merge placeholders with server list: placeholders not present on server remain on top
+        const placeholders = placeholdersRef.current || [];
+        const serverList = Array.isArray(componentList) ? componentList : [];
+        const serverRefs = new Set(serverList.map((i) => i.MediaRef));
+        const missingPlaceholders = (placeholders || []).filter((p) => !serverRefs.has(p.MediaRef));
+        setMedia([...missingPlaceholders, ...serverList]);
 
-        resolve({ componentList, totalRecords, mediaType });
+        resolve({ componentList: serverList, totalRecords, mediaType });
       });
     });
   };
@@ -363,16 +360,105 @@ const MediaList = (props) => {
     setselected(newSelected);
   };
 
+  // Poll for a single media Ref until DB returns actual record, then replace placeholder
+  const pollForMedia = async (mediaRef, attemptsLeft = POLL_MAX_ATTEMPTS) => {
+    if (!mediaRef || attemptsLeft <= 0) {
+      // give up
+      return;
+    }
+    try {
+      // Let Api client handle auth headers (avoid direct store import here)
+      const resp = await Api.get('/admin/fetchmedia', {
+        params: { MediaRef: mediaRef }
+      });
+      if (!resp.data.Error && resp.data.Details) {
+        const serverItem = resp.data.Details;
+        // robust replace: match by MediaRef OR by name/path (covers tmp blobs)
+        setMedia((prev) => {
+          let list = Array.isArray(prev) ? prev.slice() : [];
+          const idx = list.findIndex((m) =>
+            m.MediaRef === mediaRef ||
+            (m.MediaRef && serverItem.MediaRef && m.MediaRef === serverItem.MediaRef) ||
+            (m.MediaName && serverItem.MediaName && m.MediaName === serverItem.MediaName) ||
+            (m.MediaPath && serverItem.MediaPath && m.MediaPath === serverItem.MediaPath)
+          );
+
+          if (idx !== -1) {
+            list[idx] = { ...serverItem };
+          } else {
+            // remove matching placeholders (same name/path) before inserting
+            list = list.filter((m) =>
+              !(m.isProcessing && ((m.MediaName && serverItem.MediaName && m.MediaName === serverItem.MediaName) ||
+                (m.MediaPath && serverItem.MediaPath && m.MediaPath === serverItem.MediaPath)))
+            );
+            list.unshift(serverItem);
+          }
+
+          return list;
+        });
+
+        // remove placeholder entries from ref (match by name/path or tmp ref)
+        placeholdersRef.current = (placeholdersRef.current || []).filter((p) =>
+          !(p.MediaRef === mediaRef ||
+            (p.MediaName && serverItem.MediaName && p.MediaName === serverItem.MediaName) ||
+            (p.MediaPath && serverItem.MediaPath && p.MediaPath === serverItem.MediaPath))
+        );
+        return;
+      }
+    } catch (err) {
+      // ignore transient errors and try again
+    }
+    // schedule next try
+    setTimeout(() => pollForMedia(mediaRef, attemptsLeft - 1), POLL_INTERVAL_MS);
+  };
+
+  // -------------------------
+  // Placeholder handling: read persisted placeholders once on mount and keep in a ref.
+  // This ensures placeholders are available immediately and merged with server results.
+  // -------------------------
+  const placeholdersRef = useRef([]);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(UPLOADED_MEDIA_KEY);
+      if (raw) {
+        const placeholders = JSON.parse(raw);
+        if (Array.isArray(placeholders) && placeholders.length > 0) {
+          const phItems = placeholders.map((p) => ({
+            MediaRef: p.MediaRef || (`tmp_${Date.now()}_${Math.random().toString(36).substr(2,5)}`),
+            MediaName: p.fileName || p.MediaName || 'Processing...',
+            MediaPath: p.fileUrl || p.FileUrl || null,
+            Thumbnail: p.fileUrl || p.Thumbnail || null,
+            MediaType: p.fileMimetype || (p.fileUrl && p.fileUrl.toLowerCase().includes('.gif') ? 'gif' : 'image'),
+            isProcessing: true,
+            processingProgress: 0
+          }));
+
+          placeholdersRef.current = phItems;
+          // show placeholders immediately
+          setMedia((prev) => [...phItems, ...(Array.isArray(prev) ? prev : [])]);
+          // clear persisted placeholders so we don't reinsert later
+          localStorage.removeItem(UPLOADED_MEDIA_KEY);
+          // start polling each placeholder for final DB record
+          phItems.forEach((it) => { if (it.MediaRef) pollForMedia(it.MediaRef); });
+        }
+      }
+    } catch (e) {
+      console.error('Error reading uploaded placeholder from localStorage', e);
+    }
+  }, []); // run once on mount
+
+  // Update render to show processing UI for placeholder items (MediaList already renders item.MediaPath etc.)
   const renderMediaCard = (item) => {
     const src = buildSrc(item?.MediaPath);
     const thumb = buildSrc(item?.Thumbnail || item?.MediaThumb || item?.Poster);
     const rawType = (item?.MediaType || '').toString().toLowerCase();
-    
-    // ✅ PROPER TYPE DETECTION
+
+    const isProcessing = item.isProcessing || item.processing || item.isProcessing === true;
+
     const isGif = rawType === 'gif';
     const isVideo = rawType === 'video';
     const isImage = rawType === 'image';
-    
+
     const isSelected = selected.indexOf(item.MediaRef) !== -1;
 
     return (
@@ -390,27 +476,36 @@ const MediaList = (props) => {
           sx={{ position: 'absolute', left: 8, top: 8, zIndex: 5, bgcolor: 'transparent' }} />
         
         <Box sx={{ width: '100%', paddingTop: '100%', position: 'relative', bgcolor: '#f4f4f4' }}>
-          {isVideo ? (
-            thumb ? (
-              <img src={thumb} alt={item.MediaName} 
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : src ? (
-              <video src={src} 
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} 
-                muted playsInline />
-            ) : (
-              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
-                No media
+          {isProcessing ? (
+            <Box sx={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+              <Box sx={{ width: '80%', bgcolor: '#e0e0e0', height: 10, borderRadius: 2, overflow: 'hidden' }}>
+                <Box sx={{ width: '30%', height: '100%', bgcolor: '#5b67d6', transition: 'width 0.3s' }} />
               </Box>
-            )
+              <Typography variant="caption" color="text.secondary">Processing...</Typography>
+            </Box>
           ) : (
-            src ? (
-              <img src={src} alt={item.MediaName} 
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            isVideo ? (
+              thumb ? (
+                <img src={thumb} alt={item.MediaName} 
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : src ? (
+                <video src={src} 
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} 
+                  muted playsInline />
+              ) : (
+                <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
+                  No media
+                </Box>
+              )
             ) : (
-              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
-                No media
-              </Box>
+              src ? (
+                <img src={src} alt={item.MediaName} 
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
+                  No media
+                </Box>
+              )
             )
           )}
         </Box>
@@ -445,6 +540,74 @@ const MediaList = (props) => {
     if (searchQuery) return `${label} (${count || 0})`;
     return label;
   };
+
+  // helper to map activeTab to mediaType used by fetchMediaList
+  const activeTabToMediaType = (tab) => {
+    if (!tab) return null;
+    const t = tab.toString().toLowerCase();
+    if (t.includes('video')) return 'video';
+    if (t.includes('gif')) return 'gif';
+    return 'image';
+  };
+
+  // listen for upload complete events and refresh current page immediately
+  useEffect(() => {
+    const handler = (ev) => {
+      const uploaded = ev?.detail?.uploadedMedia || [];
+
+      // Replace matching placeholders with server items (match by name or path) to avoid duplicates
+      if (uploaded.length > 0) {
+        setMedia((prev) => {
+          let list = Array.isArray(prev) ? prev.slice() : [];
+          uploaded.forEach((si) => {
+            const serverName = si.fileName || si.MediaName;
+            const serverPath = si.fileUrl || si.MediaPath;
+
+            // find existing entry by MediaRef OR by name/path (covers tmp placeholders)
+            const idx = list.findIndex((m) =>
+              m.MediaRef === si.MediaRef ||
+              (m.MediaName && serverName && m.MediaName === serverName) ||
+              (m.MediaPath && serverPath && m.MediaPath === serverPath)
+            );
+
+            const serverItem = {
+              ...si,
+              MediaName: serverName || si.MediaName,
+              MediaPath: serverPath || si.MediaPath,
+              MediaType: si.fileMimetype || si.MediaType
+            };
+
+            if (idx !== -1) {
+              list[idx] = serverItem;
+            } else {
+              // remove placeholders with same name/path then add server item on top
+              list = list.filter((m) =>
+                !(m.isProcessing && ((m.MediaName && serverName && m.MediaName === serverName) || (m.MediaPath && serverPath && m.MediaPath === serverPath)))
+              );
+              list.unshift(serverItem);
+            }
+          });
+          return list;
+        });
+
+        // remove those placeholders from ref so poll won't keep them
+        placeholdersRef.current = (placeholdersRef.current || []).filter((p) =>
+          !uploaded.some((si) => {
+            const serverName = si.fileName || si.MediaName;
+            const serverPath = si.fileUrl || si.MediaPath;
+            return (p.MediaName && serverName && p.MediaName === serverName) || (p.MediaPath && serverPath && p.MediaPath === serverPath);
+          })
+        );
+      }
+
+      // also refresh counts / server data to stay consistent
+      const mediaType = activeTabToMediaType(activeTab);
+      fetchMediaList(getCurrentPage(), mediaType, searchQuery, { setDisplay: true }).catch(() => {});
+    };
+
+    window.addEventListener('ideogram:uploadComplete', handler);
+    return () => window.removeEventListener('ideogram:uploadComplete', handler);
+  }, [activeTab, imagePage, videoPage, gifPage, searchQuery]);
 
   return (
     <>

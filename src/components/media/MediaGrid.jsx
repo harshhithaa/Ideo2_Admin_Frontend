@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { Box, Checkbox, Typography } from '@mui/material';
+import { Box, Checkbox, Typography, LinearProgress } from '@mui/material';
 
 const placeholderStyle = {
   display: 'flex',
@@ -47,6 +47,8 @@ const MediaGrid = ({ media = [], setselected, selected = [], columns = 6 }) => {
     const thumb = buildSrc(item?.Thumbnail || item?.MediaThumb || item?.Poster);
     const rawType = (item?.MediaType || '').toString().toLowerCase();
     
+    const isProcessing = item.isProcessing || item.processing || false;
+
     // ✅ ENHANCED TYPE DETECTION
     const isGif = rawType === 'gif' || 
                   rawType.includes('gif') || 
@@ -93,52 +95,48 @@ const MediaGrid = ({ media = [], setselected, selected = [], columns = 6 }) => {
         />
 
         <div style={{ width: '100%', paddingTop: '100%', position: 'relative', background: '#f4f4f4' }}>
-          {isVideo ? (
-            thumb ? (
-              <img
-                src={thumb}
-                alt={item.MediaName || item.MediaRef}
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                onError={imgOnError}
-              />
-            ) : src ? (
-              <video
-                src={src}
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#000' }}
-                preload="metadata"
-                muted
-                playsInline
-              />
-            ) : (
-              <div style={{ position: 'absolute', inset: 0 }}>
-                <div style={placeholderStyle}>No media</div>
+          {isProcessing ? (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <div style={{ width: '80%' }}>
+                <LinearProgress variant="determinate" value={30} />
               </div>
-            )
-          ) : isGif ? (
-            src ? (
-              <img
-                src={src}
-                alt={item.MediaName || item.MediaRef}
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                onError={imgOnError}
-              />
-            ) : (
-              <div style={{ position: 'absolute', inset: 0 }}>
-                <div style={placeholderStyle}>No media</div>
-              </div>
-            )
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>Processing...</Typography>
+            </div>
           ) : (
-            src ? (
-              <img
-                src={src}
-                alt={item.MediaName || item.MediaRef}
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                onError={imgOnError}
-              />
+            isVideo ? (
+              thumb ? (
+                <img
+                  src={thumb}
+                  alt={item.MediaName || item.MediaRef}
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={imgOnError}
+                />
+              ) : src ? (
+                <video
+                  src={src}
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#000' }}
+                  preload="metadata"
+                  muted
+                  playsInline
+                />
+              ) : (
+                <div style={{ position: 'absolute', inset: 0 }}>
+                  <div style={placeholderStyle}>No media</div>
+                </div>
+              )
             ) : (
-              <div style={{ position: 'absolute', inset: 0 }}>
-                <div style={placeholderStyle}>No media</div>
-              </div>
+              src ? (
+                <img
+                  src={src}
+                  alt={item.MediaName || item.MediaRef}
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={imgOnError}
+                />
+              ) : (
+                <div style={{ position: 'absolute', inset: 0 }}>
+                  <div style={placeholderStyle}>No media</div>
+                </div>
+              )
             )
           )}
         </div>

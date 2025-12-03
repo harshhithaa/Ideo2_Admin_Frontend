@@ -1,7 +1,11 @@
 /* eslint-disable linebreak-style */
 /* eslint-disable import/prefer-default-export */
 /* eslint-disable linebreak-style */
-import localStorage from 'local-storage';
+// Use browser localStorage (safe fallback for SSR)
+const localStorage = (typeof window !== 'undefined' && window.localStorage)
+  ? window.localStorage
+  : { getItem: () => null, setItem: () => {}, removeItem: () => {}, clear: () => {} };
+
 import { ErrorCode, COMPONENTS } from 'src/utils/constant.jsx';
 import {
   GETUSERCOMPONENTLIST,
@@ -370,6 +374,46 @@ export const saveMedia = (data, callback) => async (dispatch) => {
   const token = store.getState().root.user.accesstoken;
 
   try {
+    // --- NEW: create immediate placeholders from FormData files before upload ---
+    try {
+      const key = 'IDEOGRAM_UPLOADED_MEDIA';
+      const existingRaw = localStorage.getItem(key);
+      const existing = existingRaw ? JSON.parse(existingRaw) : [];
+
+      const files = [];
+      if (data instanceof FormData) {
+        for (const pair of data.entries()) {
+          const v = pair[1];
+          if (v instanceof File) files.push(v);
+          else if (Array.isArray(v) && v.length && v[0] instanceof File) files.push(...v);
+        }
+      }
+
+      const placeholders = files.map((file) => {
+        const tmpRef = `tmp_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+        const url = URL.createObjectURL(file);
+        // revoke after 60s to avoid memory leak
+        setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 60000);
+        return {
+          MediaRef: tmpRef,
+          fileName: file.name,
+          fileMimetype: (file.type && file.type.split('/')[0]) || 'file',
+          fileUrl: url,
+          isProcessing: true,
+          createdAt: new Date().toISOString()
+        };
+      });
+
+      if (placeholders.length) {
+        // merge with existing placeholders (keep newest first) and dedupe by MediaRef
+        const map = new Map();
+        placeholders.concat(existing).forEach((it) => { if (!map.has(it.MediaRef)) map.set(it.MediaRef, it); });
+        localStorage.setItem(key, JSON.stringify(Array.from(map.values())));
+      }
+    } catch (e) {
+      console.warn('pre-upload placeholder write failed', e);
+    }
+
     const res = await Api.post('/admin/savemedia', data, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -378,43 +422,54 @@ export const saveMedia = (data, callback) => async (dispatch) => {
       },
       onUploadProgress: (progressEvent) => {
         if (progressEvent && progressEvent.lengthComputable) {
-          // forward progress events to UI (first param null = no error)
-          if (typeof callback === 'function') {
-            callback(null, progressEvent);
-          }
+          if (typeof callback === 'function') callback(null, progressEvent);
         }
       }
     });
 
-    console.log('✅ Upload Complete - API Response:', res.data);
-
     if (!res.data.Error) {
-      // refresh the media list from server and wait for it to complete
+      const uploadedMedia = res.data.Details && res.data.Details.Media ? res.data.Details.Media : [];
+
+      // --- remove temp placeholders (existing) ---
       try {
-        await dispatch(getUserComponentList({ componenttype: COMPONENTS.Media }));
-        console.log('Media list refreshed after upload');
-      } catch (refreshErr) {
-        console.warn('Failed to refresh media list after upload', refreshErr);
+        const key = 'IDEOGRAM_UPLOADED_MEDIA';
+        const existingRaw = localStorage.getItem(key);
+        let existing = [];
+        if (existingRaw) {
+          existing = JSON.parse(existingRaw) || [];
+        }
+
+        const uploadedNames = new Set(
+          uploadedMedia.map((p) => (p.fileName || p.MediaName || '').toString())
+        );
+
+        const filtered = existing.filter((ph) => {
+          const name = (ph.fileName || ph.MediaName || '').toString();
+          return !uploadedNames.has(name);
+        });
+
+        localStorage.setItem(key, JSON.stringify(filtered));
+      } catch (e) {
+        console.warn('persist uploaded placeholder failed', e);
       }
 
-      // final success callback (no progressEvent)
-      if (typeof callback === 'function') callback(null);
-    } else {
-      // API returned Error
-      if (res.data.Error.ErrorCode === ErrorCode.Invalid_User_Credentials) {
-        dispatch({
-          type: STOREUSER,
-          payload: {
-            valid: false,
-            accesstoken: null
-          }
-        });
+      // --- NEW: notify UI that upload completed with server results ---
+      try {
+        window.dispatchEvent(new CustomEvent('ideogram:uploadComplete', { detail: { uploadedMedia } }));
+      } catch (e) {
+        // ignore if window not available
       }
-      if (typeof callback === 'function')
-        callback({ exists: true, err: res.data.Error.ErrorMessage || 'Upload failed' });
+
+      // try to refresh list (best-effort)
+      try {
+        dispatch(getUserComponentList({ componenttype: COMPONENTS.Media }));
+      } catch (e) { /* ignore */ }
+
+      if (typeof callback === 'function') callback(null, null, res.data.Details);
+    } else {
+      if (typeof callback === 'function') callback({ exists: true, err: res.data.Error.ErrorMessage || 'Upload failed' });
     }
   } catch (err) {
-    console.error('❌ saveMedia error:', err);
     if (typeof callback === 'function') callback({ exists: true, err: err.message || err });
   }
 };
