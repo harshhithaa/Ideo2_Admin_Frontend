@@ -1,32 +1,46 @@
 import React, { useEffect, useState } from "react";
 import Api from "../service/Api";
 import { store } from "../store/store";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Alert
+} from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 
 // Predefined model data
 const MODELS = [
-  // 1×1 removed per request — only 1×2 and 2×2 remain
-  { id: "12", name: "1 × 2", blocksX: 1, blocksY: 2, finalW: 1200, finalH: 2400 },
+  // ✅ ALL LAYOUTS NOW USE SAME ASPECT RATIO (2400×2400 square canvas like 2×2)
+  // Only the internal grid structure (blocksX, blocksY) differs
+  { id: "12", name: "1 × 2", blocksX: 1, blocksY: 2, finalW: 2400, finalH: 2400 },
+  { id: "21", name: "2 × 1", blocksX: 2, blocksY: 1, finalW: 2400, finalH: 2400 },
   { id: "22", name: "2 × 2", blocksX: 2, blocksY: 2, finalW: 2400, finalH: 2400 },
 ];
 
 const maxImagesForModel = (modelId) => {
   if (modelId === "12") return 2;
+  if (modelId === "21") return 2; // 2×1 supports 2 images
   if (modelId === "22") return 4;
   return 4;
 };
 
 const SplitScreenApp = () => {
-  const HEADER_HEIGHT = 72; // adjust if your app header differs
-  const LEFT_MENU_WIDTH = 280; // keep consistent with app
+  const HEADER_HEIGHT = 72;
+  const LEFT_MENU_WIDTH = 280;
   const [orientation, setOrientation] = useState("landscape");
   const [selectedModel, setSelectedModel] = useState("22");
   const [uploadedImages, setUploadedImages] = useState([]);
-  // no default name — show placeholder only
   const [splitName, setSplitName] = useState("");
   const [leftOffset, setLeftOffset] = useState(LEFT_MENU_WIDTH);
   const [availableHeight, setAvailableHeight] = useState(
     Math.max(window.innerHeight - HEADER_HEIGHT, 420)
   );
+  const [placedAssignments, setPlacedAssignments] = useState([]);
+  const [openSuccessModal, setOpenSuccessModal] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const calcOffset = () => {
@@ -45,10 +59,11 @@ const SplitScreenApp = () => {
     setUploadedImages((prev) => (prev.length > allowed ? prev.slice(0, allowed) : prev));
   }, [selectedModel]);
 
+  // Re-init builder whenever layout or placed assignments change
   useEffect(() => {
     initializeBuilder();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orientation, selectedModel, uploadedImages, availableHeight]);
+  }, [orientation, selectedModel, uploadedImages, availableHeight, placedAssignments]);
 
   function initializeBuilder() {
     const model = MODELS.find((m) => m.id === selectedModel);
@@ -68,9 +83,17 @@ const SplitScreenApp = () => {
 
     const bgCanvas = document.createElement("canvas");
     bgCanvas.id = "background";
-    // internal pixel size for high quality export
-    bgCanvas.width = model.finalW;
-    bgCanvas.height = model.finalH;
+    
+    // ✅ SWAP DIMENSIONS BASED ON ORIENTATION
+    // Portrait: swap width/height to make canvas taller than wide
+    // Landscape: use original dimensions (wider than tall)
+    if (orientation === "portrait") {
+      bgCanvas.width = model.finalH;  // swap: use height as width
+      bgCanvas.height = model.finalW; // swap: use width as height
+    } else {
+      bgCanvas.width = model.finalW;
+      bgCanvas.height = model.finalH;
+    }
 
     // responsive sizing: choose sizing strategy by orientation
     if (orientation === "portrait") {
@@ -97,6 +120,24 @@ const SplitScreenApp = () => {
     const blockW = bgCanvas.width / model.blocksX;
     const blockH = bgCanvas.height / model.blocksY;
 
+    // Compute new assignments for this grid from previously placed images,
+    // preserving order and redistributing sequentially.
+    const totalLayers = model.blocksX * model.blocksY;
+    const prevFlat = (placedAssignments || []).filter(Boolean);
+    const assignedLocal = Array(totalLayers).fill(null);
+    for (let i = 0; i < Math.min(prevFlat.length, totalLayers); i++) {
+      assignedLocal[i] = prevFlat[i];
+    }
+
+    // If previous placedAssignments length doesn't match new total, update state (idempotent)
+    const needUpdatePlaced =
+      placedAssignments.length !== assignedLocal.length ||
+      placedAssignments.some((v, i) => (v || null) !== (assignedLocal[i] || null));
+    if (needUpdatePlaced) {
+      // avoid infinite loop: only set if different
+      setPlacedAssignments(assignedLocal);
+    }
+
     // create layer canvases (internal pixel size = block size)
     for (let y = 0; y < model.blocksY; y++) {
       for (let x = 0; x < model.blocksX; x++) {
@@ -119,6 +160,30 @@ const SplitScreenApp = () => {
         layerCanvas.setAttribute("draggable", "true");
 
         photoDiv.appendChild(layerCanvas);
+
+        // If we have an assigned image for this layer, draw it now
+        const index = y * model.blocksX + x;
+        const assignedSrc = assignedLocal[index];
+        if (assignedSrc) {
+          const image = new Image();
+          // preserve cross-origin display behavior in case of external images
+          image.crossOrigin = "anonymous";
+          image.onload = () => {
+            const cw = layerCanvas.width;
+            const ch = layerCanvas.height;
+            const iw = image.width;
+            const ih = image.height;
+            const scale = Math.max(cw / iw, ch / ih); // cover
+            const dw = iw * scale;
+            const dh = ih * scale;
+            const dx = (cw - dw) / 2;
+            const dy = (ch - dh) / 2;
+            const lctx = layerCanvas.getContext("2d");
+            lctx.clearRect(0, 0, cw, ch);
+            lctx.drawImage(image, 0, 0, iw, ih, dx, dy, dw, dh);
+          };
+          image.src = assignedSrc;
+        }
       }
     }
 
@@ -209,6 +274,21 @@ const SplitScreenApp = () => {
           const srcCtx = srcCanvas.getContext("2d");
           srcCtx.clearRect(0, 0, srcCanvas.width, srcCanvas.height);
           srcCtx.drawImage(tmp2, 0, 0, srcCanvas.width, srcCanvas.height);
+
+          // update assignment mapping (swap)
+          const partsSrc = srcCanvas.id.split("-");
+          const partsDst = canvas.id.split("-");
+          const srcIndex = parseInt(partsSrc[2], 10) * (parseInt(partsSrc[1], 10) ? 1 : 1); // fallback
+          // compute indices robustly: index = y*blocksX + x
+          const model = MODELS.find((m) => m.id === selectedModel);
+          const srcX = parseInt(partsSrc[1], 10);
+          const srcY = parseInt(partsSrc[2], 10);
+          const dstX = parseInt(partsDst[1], 10);
+          const dstY = parseInt(partsDst[2], 10);
+          const srcIdx = srcY * model.blocksX + srcX;
+          const dstIdx = dstY * model.blocksX + dstX;
+
+          setPlacedAppointmentsSwap(srcIdx, dstIdx);
           return;
         }
 
@@ -217,6 +297,7 @@ const SplitScreenApp = () => {
         if (!img || img.tagName !== "IMG") return;
 
         const image = new Image();
+        image.crossOrigin = "anonymous";
         image.onload = () => {
           // draw with "cover" behaviour but keep within canvas boundaries
           const cw = canvas.width;
@@ -231,9 +312,37 @@ const SplitScreenApp = () => {
 
           ctx.clearRect(0, 0, cw, ch);
           ctx.drawImage(image, 0, 0, iw, ih, dx, dy, dw, dh);
+
+          // update placedAssignments for this canvas
+          const parts = canvas.id.split("-");
+          const lx = parseInt(parts[1], 10);
+          const ly = parseInt(parts[2], 10);
+          const model = MODELS.find((m) => m.id === selectedModel);
+          const index = ly * model.blocksX + lx;
+          setPlacedAssignments((prev) => {
+            const copy = Array.from(prev || []);
+            // ensure length
+            const needed = model.blocksX * model.blocksY;
+            while (copy.length < needed) copy.push(null);
+            copy[index] = img.src;
+            return copy;
+          });
         };
         image.src = img.src;
       });
+    });
+  }
+
+  // helper to swap two indices in placedAssignments (keeps order)
+  function setPlacedAppointmentsSwap(i, j) {
+    setPlacedAssignments((prev) => {
+      const copy = Array.from(prev || []);
+      const maxLen = Math.max(i, j) + 1;
+      while (copy.length < maxLen) copy.push(null);
+      const tmp = copy[i];
+      copy[i] = copy[j];
+      copy[j] = tmp;
+      return copy;
     });
   }
 
@@ -279,8 +388,16 @@ const SplitScreenApp = () => {
 
     btn.onclick = function () {
       const finalCanvas = document.createElement("canvas");
-      finalCanvas.width = model.finalW;
-      finalCanvas.height = model.finalH;
+      
+      // ✅ APPLY SAME ORIENTATION SWAP FOR FINAL EXPORT
+      if (orientation === "portrait") {
+        finalCanvas.width = model.finalH;
+        finalCanvas.height = model.finalW;
+      } else {
+        finalCanvas.width = model.finalW;
+        finalCanvas.height = model.finalH;
+      }
+      
       const ctx = finalCanvas.getContext("2d");
 
       const bg = document.getElementById("background");
@@ -307,7 +424,6 @@ const SplitScreenApp = () => {
         ctx.drawImage(tmp, x * blockW, y * blockH, blockW, blockH);
       });
 
-      // download locally and upload automatically to media endpoint
       finalCanvas.toBlob((blob) => {
         if (!blob) return;
 
@@ -324,7 +440,10 @@ const SplitScreenApp = () => {
         link.click();
         URL.revokeObjectURL(url);
 
-        // also upload automatically to media endpoint
+        // ✅ SHOW SUCCESS MODAL IMMEDIATELY AFTER DOWNLOAD STARTS
+        setOpenSuccessModal(true);
+
+        // also upload automatically to media endpoint (in background)
         try {
           const token = store.getState().root.user?.accesstoken;
           const fd = new FormData();
@@ -339,7 +458,6 @@ const SplitScreenApp = () => {
             }
           })
             .then((res) => {
-              // optional: show toast in UI — here just console
               if (!res.data.Error) {
                 console.log("Split-screen uploaded to media successfully");
               } else {
@@ -393,11 +511,61 @@ const SplitScreenApp = () => {
   };
 
   const removeImage = (id) => {
+    // remove from uploadedImages, and remove any placements of this image from placedAssignments
+    const found = uploadedImages.find((it) => it.id === id);
+    const srcToRemove = found?.src;
     setUploadedImages((prev) => prev.filter((img) => img.id !== id));
+
+    if (srcToRemove) {
+      setPlacedAssignments((prev) => {
+        const prevArr = Array.from(prev || []);
+        // filter out occurrences of this src and re-sequence remaining placed images
+        const filtered = prevArr.filter((v) => v && v !== srcToRemove);
+        const newArr = Array(prevArr.length).fill(null);
+        for (let i = 0; i < filtered.length && i < newArr.length; i++) {
+          newArr[i] = filtered[i];
+        }
+        return newArr;
+      });
+    }
+  };
+
+  // ✅ ADD NAVIGATION HANDLER
+  const goToMediaLibrary = () => {
+    setOpenSuccessModal(false);
+    navigate('/app/media', { 
+      state: { 
+        openTab: 'IMAGES',
+        fromUpload: true 
+      } 
+    });
   };
 
   return (
     <>
+      <Dialog
+        open={openSuccessModal}
+        onClose={() => setOpenSuccessModal(false)}
+        aria-labelledby="upload-result-title"
+      >
+        <DialogTitle id="upload-result-title" sx={{ textAlign: 'center' }}>
+          Success
+        </DialogTitle>
+        <DialogContent sx={{ minWidth: 320, display: 'flex', justifyContent: 'center' }}>
+          <Alert severity="success" sx={{ width: '100%', textAlign: 'center' }}>
+            Media uploaded successfully. View it in Media Library.
+          </Alert>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 2 }}>
+          <Button onClick={goToMediaLibrary} variant="contained" color="primary" size="small">
+            GO TO MEDIA LIBRARY
+          </Button>
+          <Button onClick={() => setOpenSuccessModal(false)} variant="outlined" size="small">
+            CLOSE
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* container positioned to cover entire app area to the right of left menu */}
       <div
         style={{
@@ -409,7 +577,7 @@ const SplitScreenApp = () => {
           padding: "16px",
           boxSizing: "border-box",
           overflow: "hidden",
-          backgroundColor: "transparent" /* keep your theme */,
+          backgroundColor: "transparent",
         }}
       >
         {/* Header */}
@@ -493,7 +661,7 @@ const SplitScreenApp = () => {
                   textAlign: "center",
                   cursor: "pointer",
                   boxSizing: "border-box",
-                  minHeight: 140, // keep original look
+                  minHeight: 14, // keep original look
                   /* keep helper dotted box visible when user scrolls thumbnails */
                   position: "sticky",
                   top: 12,
@@ -694,7 +862,7 @@ const SplitScreenApp = () => {
                    alignSelf: "stretch",
                  }}
                >
-                 {`Download & Upload${splitName ? ` as "${splitName.trim()}.png"` : ""}`}
+                 {`Download & Upload to Media${splitName ? ` as "${splitName.trim()}.png"` : ""}`}
                </button>
              </div>
           </div>
