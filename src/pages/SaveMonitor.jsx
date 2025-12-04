@@ -62,7 +62,10 @@ const SaveMonitorDetails = (props) => {
   // --- Rework schedule selection: use refs in Select value to allow proper toggle/unselect ---
   const [selectedScheduleRefs, setSelectedScheduleRefs] = useState(() => {
     const prevList = (state && state.Schedules) || [];
-    return prevList.filter((item) => item.IsActive === 1).map((s) => s.ScheduleRef);
+    // keep only active items with a valid ScheduleRef
+    return prevList
+      .filter((item) => item && item.IsActive === 1 && Boolean(item.ScheduleRef))
+      .map((s) => s.ScheduleRef);
   });
   // keep original object array only as derived data for rendering and checks
   const selectedScheduleObjects = useMemo(() => {
@@ -159,21 +162,29 @@ const SaveMonitorDetails = (props) => {
 
   function saveMonitorData() {
     // derive currently selected schedules from the selectedScheduleObjects (keeps chips + select in sync)
-    const selectedSchedules = (selectedScheduleObjects || []).map((item) => ({
-      ScheduleRef: item.ScheduleRef,
-      IsActive: 1
-    }));
+    const selectedSchedules = (selectedScheduleObjects || [])
+      .filter((item) => item && item.ScheduleRef) // DROP invalid/null refs
+      .map((item) => ({
+        ScheduleRef: item.ScheduleRef,
+        IsActive: 1
+      }));
+
+    // filter deletedSchedules to only include valid refs (defensive)
+    const validDeleted = (deletedSchedules || []).filter((d) => d && d.ScheduleRef);
 
     const saveMonitorDetails = {
       MonitorName: title,
       Description: description,
       DefaultPlaylistRef: selectedPlaylist,
-      // include active selections and any deleted markers
-      Schedules: [...selectedSchedules, ...deletedSchedules],
+      // include active selections and any deleted markers (only valid refs)
+      Schedules: [...selectedSchedules, ...validDeleted],
       IsActive: 1,
       Orientation: orientation === 'Landscape' ? '90' : '0'
     };
     if (MonitorRef !== '') saveMonitorDetails.MonitorRef = MonitorRef;
+
+    // debug payload to help trace bad requests during testing
+    console.log('saveMonitorDetails payload:', JSON.stringify(saveMonitorDetails));
 
     props.saveMonitor(saveMonitorDetails, (err) => {
       if (err.exists) {
@@ -188,13 +199,13 @@ const SaveMonitorDetails = (props) => {
   }
 
   const handleChange = (e) => {
-    // e.target.value is an array of ScheduleRef (strings) now
-    const newRefs = Array.isArray(e.target.value) ? e.target.value : [];
+    // e.target.value is an array of ScheduleRef (strings) now - filter falsy entries
+    const newRefs = Array.isArray(e.target.value) ? e.target.value.filter(Boolean) : [];
     // compute deleted: items that were previously selected but now not present
     const removed = selectedScheduleRefs.filter((r) => !newRefs.includes(r));
     if (removed.length > 0) {
       const addedDeleted = removed
-        .filter((ref) => !deletedSchedules.some((d) => d.ScheduleRef === ref))
+        .filter((ref) => Boolean(ref) && !deletedSchedules.some((d) => d.ScheduleRef === ref))
         .map((ref) => ({ ScheduleRef: ref, IsActive: 0 }));
       if (addedDeleted.length) {
         setDeletedSchedules((prev) => [...prev, ...addedDeleted]);
