@@ -6,7 +6,7 @@
 /* eslint-disable no-shadow */
 /* eslint-disable array-callback-return */
 /* eslint-disable react/prop-types */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 
@@ -59,6 +59,21 @@ const SaveMonitorDetails = (props) => {
     (state && state.PlaylistRef) || ''
   );
   const [selectedSchedule, setSelectedSchedule] = useState([]);
+  // --- Rework schedule selection: use refs in Select value to allow proper toggle/unselect ---
+  const [selectedScheduleRefs, setSelectedScheduleRefs] = useState(() => {
+    const prevList = (state && state.Schedules) || [];
+    return prevList.filter((item) => item.IsActive === 1).map((s) => s.ScheduleRef);
+  });
+  // keep original object array only as derived data for rendering and checks
+  const selectedScheduleObjects = useMemo(() => {
+    const allSchedules = scheduleData || [];
+    const fromState = (state && state.Schedules) || [];
+    return selectedScheduleRefs.map((ref) =>
+      allSchedules.find((s) => s.ScheduleRef === ref)
+      || fromState.find((s) => s.ScheduleRef === ref)
+      || { ScheduleRef: ref, Title: ref }
+    );
+  }, [selectedScheduleRefs, scheduleData, state]);
   const [deletedSchedules, setDeletedSchedules] = useState([]);
   const [updatedSchedules, setUpdatedSchedules] = useState([]);
   const [loader, setloader] = useState(true);
@@ -102,6 +117,18 @@ const SaveMonitorDetails = (props) => {
   const controlWidth = { xs: '100%', sm: '720px' };
   
   useEffect(() => {
+    const comp = props.component || {};
+    if (comp.playlistList && comp.playlistList.length) {
+      setPlaylistData(comp.playlistList);
+      setPlaylist(comp.playlistList);
+    }
+    if (comp.scheduleList && comp.scheduleList.length) {
+      setScheduleData(comp.scheduleList);
+      setSchedule(comp.scheduleList);
+    }
+  }, [props.component]);
+
+  useEffect(() => {
     const data = {
       componenttype: COMPONENTS.Playlist
     };
@@ -109,48 +136,20 @@ const SaveMonitorDetails = (props) => {
       componenttype: COMPONENTS.Schedule
     };
 
-    console.log('outside', data);
     props.getUserComponentList(data, (err) => {
-      console.log('data', data);
-      console.log('err', err);
-      if (err.exists) {
-        console.log('err.errmessage', err.errmessage);
-      } else {
-        console.log('props', props, 'component', component);
-        setPlaylist(component.playlistList);
+      if (!err.exists) {
+        // playlist will be set in props.component effect
         setloader(false);
-        console.log('playlist', playlist);
       }
     });
-    setPlaylistData(playlist);
 
     props.getUserComponentList(dataForSchedule, (err) => {
-      console.log('data', dataForSchedule);
-      console.log('err', err);
-      if (err.exists) {
-        console.log('err.errmessage', err.errmessage);
-      } else {
-        console.log('props', props, 'component', component);
-        setSchedule(component.scheduleList);
+      if (!err.exists) {
+        // schedule will be set in props.component effect
         setScheduleloader(false);
-        console.log('schedule', schedule);
       }
     });
-
-    setScheduleData(schedule);
-    const prevList = [];
-
-    state &&
-      state.Schedules &&
-      state.Schedules.map((item) => {
-        if (item.IsActive === 1) {
-          prevList.push(item);
-        }
-      });
-
-    setSelectedSchedule(prevList);
-    console.log('prevList', prevList);
-  }, [loader, scheduleloader]);
+  }, [/* keep empty to only run once on mount */]);
 
   // const saveData = () => {
   //   console.log(selectedSchedule);
@@ -159,16 +158,18 @@ const SaveMonitorDetails = (props) => {
   // };
 
   function saveMonitorData() {
-    const selectedSchedules = selectedSchedule.map((item) => ({
+    // derive currently selected schedules from the selectedScheduleObjects (keeps chips + select in sync)
+    const selectedSchedules = (selectedScheduleObjects || []).map((item) => ({
       ScheduleRef: item.ScheduleRef,
-      IsActive: item.IsActive
+      IsActive: 1
     }));
 
     const saveMonitorDetails = {
       MonitorName: title,
       Description: description,
       DefaultPlaylistRef: selectedPlaylist,
-      Schedules: [...selectedSchedules, ...deletedSchedules], // deletedSchedules: [{ScheduleRef, IsActive: 0}]
+      // include active selections and any deleted markers
+      Schedules: [...selectedSchedules, ...deletedSchedules],
       IsActive: 1,
       Orientation: orientation === 'Landscape' ? '90' : '0'
     };
@@ -187,204 +188,150 @@ const SaveMonitorDetails = (props) => {
   }
 
   const handleChange = (e) => {
-    console.log('Schedule Changed', e.target.value);
-    setSelectedSchedule(e.target.value);
-    let deletedarr = [];
-    e.target.value.map((item) => {
-      if (
-        IsValuePresentInArray(deletedSchedules, 'ScheduleRef', item.ScheduleRef)
-      ) {
-        deletedarr = deletedSchedules.filter(
-          (deletedSchedule) => deletedSchedule.IsActive === item.IsActive
-        );
+    // e.target.value is an array of ScheduleRef (strings) now
+    const newRefs = Array.isArray(e.target.value) ? e.target.value : [];
+    // compute deleted: items that were previously selected but now not present
+    const removed = selectedScheduleRefs.filter((r) => !newRefs.includes(r));
+    if (removed.length > 0) {
+      const addedDeleted = removed
+        .filter((ref) => !deletedSchedules.some((d) => d.ScheduleRef === ref))
+        .map((ref) => ({ ScheduleRef: ref, IsActive: 0 }));
+      if (addedDeleted.length) {
+        setDeletedSchedules((prev) => [...prev, ...addedDeleted]);
       }
-    });
-    setDeletedSchedules(deletedarr);
+    }
+    setSelectedScheduleRefs(newRefs);
   };
 
   const handleRemoveSchedule = (e, value) => {
-    if (
-      !IsValuePresentInArray(deletedSchedules, 'ScheduleRef', value.ScheduleRef)
-    ) {
-      deletedSchedules.push({ ScheduleRef: value.ScheduleRef, IsActive: 0 });
-      console.log('Removed schedule', deletedSchedules);
+    const ref = value && value.ScheduleRef;
+    if (!ref) return;
+    if (!deletedSchedules.some((d) => d.ScheduleRef === ref)) {
+      setDeletedSchedules((prev) => [...prev, { ScheduleRef: ref, IsActive: 0 }]);
     }
-    setSelectedSchedule(
-      selectedSchedule.filter((item) => item.ScheduleRef !== value.ScheduleRef)
-    );
+    setSelectedScheduleRefs((prev) => prev.filter((r) => r !== ref));
   };
 
   const handleDateAndTime = () => {
-    let isClashing;
+    // reuse helper logic but operate on selectedScheduleObjects
+    const parseISODate = (d) => {
+      if (!d) return null;
+      if (d.includes('-')) {
+        const parts = d.split('-').map((p) => p.trim());
+        if (parts[0].length === 4) {
+          return new Date(`${parts[0]}-${parts[1]}-${parts[2]}T00:00:00`);
+        }
+        return new Date(`${parts[2]}-${parts[1]}-${parts[0]}T00:00:00`);
+      }
+      const dd = new Date(d);
+      return isNaN(dd.getTime()) ? null : dd;
+    };
 
-    for (let i = 0; i < selectedSchedule.length; i++) {
-      for (let j = i + 1; j < selectedSchedule.length; j++) {
-        if (selectedSchedule[i].StartTime < selectedSchedule[j].StartTime) {
-          if (selectedSchedule[i].EndTime < selectedSchedule[j].StartTime) {
-            console.log('Pass 1', selectedSchedule[i], selectedSchedule[j]);
-            // saveMonitorData();
-          } else {
-            if (selectedSchedule[i].StartDate < selectedSchedule[j].StartDate) {
-              if (selectedSchedule[i].EndDate < selectedSchedule[j].StartDate) {
-                console.log('Pass 2', selectedSchedule[i], selectedSchedule[j]);
-                // saveMonitorData();
-              } else {
-                // setOpenSnackbar(true);
-                isClashing = true;
-                if (!clashingSchedules.includes(selectedSchedule[i].Title)) {
-                  clashingSchedules.push(selectedSchedule[i].Title);
-                }
-                if (!clashingSchedules.includes(selectedSchedule[j].Title)) {
-                  clashingSchedules.push(selectedSchedule[j].Title);
-                }
-                console.log(
-                  'Clash 1',
-                  selectedSchedule[i],
-                  selectedSchedule[j]
-                );
-              }
-            } else if (
-              selectedSchedule[i].StartDate > selectedSchedule[j].StartDate
-            ) {
-              if (selectedSchedule[i].StartDate > selectedSchedule[j].EndDate) {
-                console.log('Pass 3', selectedSchedule[i], selectedSchedule[j]);
-                // saveMonitorData();
-              } else {
-                // setOpenSnackbar(true);
-                isClashing = true;
-                if (!clashingSchedules.includes(selectedSchedule[i].Title)) {
-                  clashingSchedules.push(selectedSchedule[i].Title);
-                }
-                if (!clashingSchedules.includes(selectedSchedule[j].Title)) {
-                  clashingSchedules.push(selectedSchedule[j].Title);
-                }
-                console.log(
-                  'Clash 2',
-                  selectedSchedule[i],
-                  selectedSchedule[j]
-                );
-              }
-            } else if (
-              selectedSchedule[i].StartDate === selectedSchedule[j].StartDate
-            ) {
-              isClashing = true;
-              if (!clashingSchedules.includes(selectedSchedule[i].Title)) {
-                clashingSchedules.push(selectedSchedule[i].Title);
-              }
-              if (!clashingSchedules.includes(selectedSchedule[j].Title)) {
-                clashingSchedules.push(selectedSchedule[j].Title);
-              }
-              console.log('Clash 3', selectedSchedule[i], selectedSchedule[j]);
-            }
-          }
-        } else if (
-          selectedSchedule[i].StartTime > selectedSchedule[j].StartTime
-        ) {
-          if (selectedSchedule[i].StartTime > selectedSchedule[j].EndTime) {
-            console.log('Pass 4', selectedSchedule[i], selectedSchedule[j]);
-            // saveMonitorData();
-          } else {
-            if (selectedSchedule[i].StartDate < selectedSchedule[j].StartDate) {
-              if (selectedSchedule[i].EndDate < selectedSchedule[j].StartDate) {
-                console.log('Pass 5', selectedSchedule[i], selectedSchedule[j]);
-                // saveMonitorData();
-              } else {
-                // setOpenSnackbar(true);
-                isClashing = true;
-                if (!clashingSchedules.includes(selectedSchedule[i].Title)) {
-                  clashingSchedules.push(selectedSchedule[i].Title);
-                }
-                if (!clashingSchedules.includes(selectedSchedule[j].Title)) {
-                  clashingSchedules.push(selectedSchedule[j].Title);
-                }
-                console.log(
-                  'Clash 4',
-                  selectedSchedule[i],
-                  selectedSchedule[j]
-                );
-              }
-            } else if (
-              selectedSchedule[i].StartDate > selectedSchedule[j].StartDate
-            ) {
-              if (selectedSchedule[i].StartDate > selectedSchedule[j].EndDate) {
-                console.log('Pass 6', selectedSchedule[i], selectedSchedule[j]);
-                // saveMonitorData();
-              } else {
-                // setOpenSnackbar(true);
-                isClashing = true;
-                if (!clashingSchedules.includes(selectedSchedule[i].Title)) {
-                  clashingSchedules.push(selectedSchedule[i].Title);
-                }
-                if (!clashingSchedules.includes(selectedSchedule[j].Title)) {
-                  clashingSchedules.push(selectedSchedule[j].Title);
-                }
-                console.log(
-                  'Clash 5',
-                  selectedSchedule[i],
-                  selectedSchedule[j]
-                );
-              }
-            } else if (
-              selectedSchedule[i].StartDate === selectedSchedule[j].StartDate
-            ) {
-              isClashing = true;
-              if (!clashingSchedules.includes(selectedSchedule[i].Title)) {
-                clashingSchedules.push(selectedSchedule[i].Title);
-              }
-              if (!clashingSchedules.includes(selectedSchedule[j].Title)) {
-                clashingSchedules.push(selectedSchedule[j].Title);
-              }
-              console.log('Clash 6', selectedSchedule[i], selectedSchedule[j]);
-            }
-          }
-        } else if (
-          selectedSchedule[i].StartTime === selectedSchedule[j].StartTime
-        ) {
-          if (selectedSchedule[i].StartDate < selectedSchedule[j].StartDate) {
-            if (selectedSchedule[i].EndDate < selectedSchedule[j].StartDate) {
-              console.log('Pass 7', selectedSchedule[i], selectedSchedule[j]);
-              // saveMonitorData();
-            } else {
-              // setOpenSnackbar(true);
-              isClashing = true;
-              if (!clashingSchedules.includes(selectedSchedule[i].Title)) {
-                clashingSchedules.push(selectedSchedule[i].Title);
-              }
-              if (!clashingSchedules.includes(selectedSchedule[j].Title)) {
-                clashingSchedules.push(selectedSchedule[j].Title);
-              }
-              console.log('Clash 7', selectedSchedule[i], selectedSchedule[j]);
-            }
-          } else if (
-            selectedSchedule[i].StartDate > selectedSchedule[j].StartDate
-          ) {
-            if (selectedSchedule[i].StartDate > selectedSchedule[j].EndDate) {
-              console.log('Pass 8', selectedSchedule[i], selectedSchedule[j]);
-              // saveMonitorData();
-            } else {
-              // setOpenSnackbar(true);
-              isClashing = true;
-              if (!clashingSchedules.includes(selectedSchedule[i].Title)) {
-                clashingSchedules.push(selectedSchedule[i].Title);
-              }
-              if (!clashingSchedules.includes(selectedSchedule[j].Title)) {
-                clashingSchedules.push(selectedSchedule[j].Title);
-              }
-              console.log('Clash 8', selectedSchedule[i], selectedSchedule[j]);
-            }
-          } else if (
-            selectedSchedule[i].StartDate === selectedSchedule[j].StartDate
-          ) {
-            isClashing = true;
-            if (!clashingSchedules.includes(selectedSchedule[i].Title)) {
-              clashingSchedules.push(selectedSchedule[i].Title);
-            }
-            if (!clashingSchedules.includes(selectedSchedule[j].Title)) {
-              clashingSchedules.push(selectedSchedule[j].Title);
-            }
+    const timeToMinutes = (t) => {
+      if (!t) return null;
+      const [hh, mm] = String(t).split(':').map(Number);
+      if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+      return hh * 60 + mm;
+    };
 
-            console.log('Clash 9', selectedSchedule[i], selectedSchedule[j]);
+    const normalizeDaysToIndices = (daysInput) => {
+      if (!daysInput) return new Set();
+      let arr = [];
+      if (Array.isArray(daysInput)) arr = daysInput;
+      else if (typeof daysInput === 'string') {
+        arr = daysInput.split(',').map((s) => s.trim());
+      } else {
+        return new Set();
+      }
+      const map = {
+        sunday: 0, sun: 0,
+        monday: 1, mon: 1,
+        tuesday: 2, tue: 2, tues: 2,
+        wednesday: 3, wed: 3,
+        thursday: 4, thu: 4, thur: 4, thurs: 4,
+        friday: 5, fri: 5,
+        saturday: 6, sat: 6
+      };
+      const out = new Set();
+      arr.forEach((d) => {
+        if (d === null || typeof d === 'undefined') return;
+        const s = String(d).toLowerCase().trim();
+        if (s === '') return;
+        if (map.hasOwnProperty(s)) out.add(map[s]);
+        else {
+          const n = parseInt(s, 10);
+          if (!Number.isNaN(n) && n >= 0 && n <= 6) out.add(n);
+        }
+      });
+      return out;
+    };
+
+    const dateRangesOverlap = (aStart, aEnd, bStart, bEnd) => {
+      return aStart <= bEnd && bStart <= aEnd;
+    };
+
+    const rangeHasWeekday = (startDate, endDate, weekday) => {
+      const startDow = startDate.getDay();
+      const diff = (weekday - startDow + 7) % 7;
+      const candidate = new Date(startDate);
+      candidate.setDate(startDate.getDate() + diff);
+      candidate.setHours(0, 0, 0, 0);
+      return candidate <= endDate;
+    };
+
+    const schedules = selectedScheduleObjects || [];
+    let isClashing = false;
+    clashingSchedules = [];
+
+    for (let i = 0; i < schedules.length; i++) {
+      const A = schedules[i];
+      const A_startDate = parseISODate(A.StartDate);
+      const A_endDate = parseISODate(A.EndDate);
+      const A_startMinutes = timeToMinutes(A.StartTime);
+      const A_endMinutes = timeToMinutes(A.EndTime);
+      const A_days = normalizeDaysToIndices(A.Days || A.DaysOfWeek || A.Days || A.Days);
+
+      if (!A_startDate || !A_endDate || A_startMinutes === null || A_endMinutes === null) continue;
+
+      for (let j = i + 1; j < schedules.length; j++) {
+        const B = schedules[j];
+        const B_startDate = parseISODate(B.StartDate);
+        const B_endDate = parseISODate(B.EndDate);
+        const B_startMinutes = timeToMinutes(B.StartTime);
+        const B_endMinutes = timeToMinutes(B.EndTime);
+        const B_days = normalizeDaysToIndices(B.Days || B.DaysOfWeek || B.Days || B.Days);
+
+        if (!B_startDate || !B_endDate || B_startMinutes === null || B_endMinutes === null) continue;
+
+        if (!dateRangesOverlap(A_startDate, A_endDate, B_startDate, B_endDate)) {
+          continue;
+        }
+
+        const commonDays = [...A_days].filter((d) => B_days.has(d));
+        if (commonDays.length === 0) {
+          continue;
+        }
+
+        const timesOverlap = (A_startMinutes < B_endMinutes) && (B_startMinutes < A_endMinutes);
+        if (!timesOverlap) {
+          continue;
+        }
+
+        const interStart = A_startDate > B_startDate ? A_startDate : B_startDate;
+        const interEnd = A_endDate < B_endDate ? A_endDate : B_endDate;
+        let weekdayFound = false;
+        for (const wd of commonDays) {
+          if (rangeHasWeekday(interStart, interEnd, wd)) {
+            weekdayFound = true;
+            break;
           }
+        }
+        if (weekdayFound && timesOverlap) {
+          isClashing = true;
+          const aTitle = A.Title || `Schedule ${i + 1}`;
+          const bTitle = B.Title || `Schedule ${j + 1}`;
+          if (!clashingSchedules.includes(aTitle)) clashingSchedules.push(aTitle);
+          if (!clashingSchedules.includes(bTitle)) clashingSchedules.push(bTitle);
         }
       }
     }
@@ -675,7 +622,7 @@ const SaveMonitorDetails = (props) => {
                           labelId="select-schedule"
                           id="select-schedule"
                           multiple
-                          value={selectedSchedule}
+                          value={selectedScheduleRefs}
                           renderValue={(selected) => (
                             <div
                               style={{
@@ -689,30 +636,33 @@ const SaveMonitorDetails = (props) => {
                                 width: '100%'
                               }}
                             >
-                              {selected.map((value, index) => (
-                                <div key={index} style={{ width: '90%' }}>
-                                  <Chip
-                                    label={`${value.Title} (${value.StartTime} - ${value.EndTime}) (${value.StartDate} - ${value.EndDate})`}
-                                    style={{
-                                      margin: 2,
-                                      width: '100%',
-                                      boxSizing: 'border-box',
-                                      overflow: 'hidden',
-                                      whiteSpace: 'nowrap',
-                                      textOverflow: 'ellipsis',
-                                      position: 'relative'
-                                    }}
-                                    clickable
-                                    onDelete={(e) => handleRemoveSchedule(e, value)}
-                                    deleteIcon={
-                                      <CancelRounded
-                                        style={{ position: 'absolute', right: 8 }}
-                                        onMouseDown={(event) => event.stopPropagation()}
-                                      />
-                                    }
-                                  />
-                                </div>
-                              ))}
+                              {selected.map((ref, index) => {
+                                const value = selectedScheduleObjects.find((s) => s.ScheduleRef === ref) || { ScheduleRef: ref, Title: ref };
+                                return (
+                                  <div key={index} style={{ width: '90%' }}>
+                                    <Chip
+                                      label={`${value.Title} (${value.StartTime || ''} - ${value.EndTime || ''}) (${value.StartDate || ''} - ${value.EndDate || ''})`}
+                                      style={{
+                                        margin: 2,
+                                        width: '100%',
+                                        boxSizing: 'border-box',
+                                        overflow: 'hidden',
+                                        whiteSpace: 'nowrap',
+                                        textOverflow: 'ellipsis',
+                                        position: 'relative'
+                                      }}
+                                      clickable
+                                      onDelete={(e) => handleRemoveSchedule(e, value)}
+                                      deleteIcon={
+                                        <CancelRounded
+                                          style={{ position: 'absolute', right: 8 }}
+                                          onMouseDown={(event) => event.stopPropagation()}
+                                        />
+                                      }
+                                    />
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                           onChange={(e) => {
@@ -749,11 +699,9 @@ const SaveMonitorDetails = (props) => {
                         >
                           {scheduleData && scheduleData.length > 0 ? (
                             scheduleData.map((item) => {
-                              const isChecked = selectedSchedule.some(
-                                (s) => s && s.ScheduleRef === item.ScheduleRef
-                              );
+                              const isChecked = selectedScheduleRefs.includes(item.ScheduleRef);
                               return (
-                                <MenuItem key={item.ScheduleRef} value={item}>
+                                <MenuItem key={item.ScheduleRef} value={item.ScheduleRef}>
                                   <Checkbox checked={isChecked} size="small" sx={{ mr: 1 }} />
                                   {item.Title}
                                 </MenuItem>
