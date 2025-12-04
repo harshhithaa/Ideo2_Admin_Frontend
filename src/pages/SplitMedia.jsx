@@ -42,6 +42,9 @@ const SplitScreenApp = () => {
   const [openSuccessModal, setOpenSuccessModal] = useState(false);
   const navigate = useNavigate();
 
+  // Ensure thumbnail layout is based on how many thumbnails exist (so upload area always shows ALL uploadedImages)
+  const thumbColumns = Math.min(Math.max(uploadedImages.length || 1, 1), 4);
+  
   useEffect(() => {
     const calcOffset = () => {
       const w = window.innerWidth;
@@ -53,10 +56,16 @@ const SplitScreenApp = () => {
     return () => window.removeEventListener("resize", calcOffset);
   }, []);
 
-  // Trim uploaded images when model changes (enforce allowed count)
+  // When model changes, keep ALL uploaded images but adjust the preview assignment
+  // (placedAssignments) to match new grid size. This keeps the upload area intact.
   useEffect(() => {
     const allowed = maxImagesForModel(selectedModel);
-    setUploadedImages((prev) => (prev.length > allowed ? prev.slice(0, allowed) : prev));
+    setPlacedAssignments((prev) => {
+      const current = Array.isArray(prev) ? prev.slice(0, allowed) : [];
+      // pad with nulls so placedAssignments length === allowed
+      while (current.length < allowed) current.push(null);
+      return current;
+    });
   }, [selectedModel]);
 
   // Re-init builder whenever layout or placed assignments change
@@ -812,8 +821,9 @@ const SplitScreenApp = () => {
                       draggable
                       onDragStart={(e) => handleDragStart(e, img.id)}
                       style={{
-                        flex: `0 0 calc(${100 / Math.min(maxImagesForModel(selectedModel), 4)}% - 6px)`,
-                        maxWidth: `calc(${100 / Math.min(maxImagesForModel(selectedModel), 4)}% - 6px)`,
+                        // use thumbColumns (based on uploadedImages.length) so thumbnails area always renders ALL uploaded images
+                        flex: `0 0 calc(${100 / thumbColumns}% - 6px)`,
+                        maxWidth: `calc(${100 / thumbColumns}% - 6px)`,
                         height: 72,
                         borderRadius: 6,
                         overflow: "hidden",
