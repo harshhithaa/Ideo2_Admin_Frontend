@@ -438,7 +438,8 @@ const SplitScreenApp = () => {
         link.download = filename;
         link.href = url;
         link.click();
-        URL.revokeObjectURL(url);
+        // do NOT revoke immediately; keep blob URL for preview placeholder
+        // URL.revokeObjectURL(url);
 
         // ✅ SHOW SUCCESS MODAL IMMEDIATELY AFTER DOWNLOAD STARTS
         setOpenSuccessModal(true);
@@ -451,22 +452,97 @@ const SplitScreenApp = () => {
           fd.append("Media", blob, filename);
           fd.append("MediaName", filename);
 
-          Api.post("/admin/savemedia", fd, {
-            headers: {
-              "Content-Type": "multipart/form-data",
-              AuthToken: token
+          // Create a temporary placeholder so MediaList will show progress immediately
+          try {
+            const tmpRef = `tmp_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+            const placeholder = {
+              MediaRef: tmpRef,
+              fileName: filename,
+              fileUrl: url,
+              fileSize: blob.size || null,
+              fileMimetype: "image/png",
+              isProcessing: true,
+              processingProgress: 0,
+              createdAt: new Date().toISOString()
+            };
+
+            const KEY = "IDEOGRAM_UPLOADED_MEDIA";
+            try {
+              const raw = localStorage.getItem(KEY);
+              const existing = raw ? JSON.parse(raw) : [];
+              // put newest first, dedupe by MediaRef
+              const map = new Map();
+              [placeholder, ...existing].forEach((p) => { if (!map.has(p.MediaRef)) map.set(p.MediaRef, p); });
+              localStorage.setItem(KEY, JSON.stringify(Array.from(map.values())));
+            } catch (e) {
+              console.warn("write placeholder failed", e);
             }
-          })
-            .then((res) => {
-              if (!res.data.Error) {
-                console.log("Split-screen uploaded to media successfully");
-              } else {
-                console.warn("Upload returned error:", res.data.Error);
+
+            // tell UI about new placeholder (progress 0)
+            try {
+              window.dispatchEvent(new CustomEvent("ideogram:uploadProgress", { detail: { progress: 0, placeholders: [placeholder] } }));
+            } catch (e) { /* ignore */ }
+
+            // perform upload with progress reporting
+            Api.post("/admin/savemedia", fd, {
+              headers: {
+                "Content-Type": "multipart/form-data",
+                AuthToken: token
+              },
+              onUploadProgress: (ev) => {
+                try {
+                  // compute percent (guard zero total)
+                  const loaded = ev?.loaded || 0;
+                  const total = ev?.total || placeholder.fileSize || 1;
+                  let pct = Math.round((loaded / total) * 100);
+                  if (pct >= 100) pct = 99; // reserve 100 for server confirmation
+                  window.dispatchEvent(new CustomEvent("ideogram:uploadProgress", { detail: { progress: pct, placeholders: [placeholder] } }));
+                } catch (err) { /* ignore */ }
               }
             })
-            .catch((err) => {
-              console.error("Automatic upload failed:", err);
-            });
+              .then((res) => {
+                // on server success, remove placeholder and notify final state
+                try {
+                  if (!res.data.Error) {
+                    // remove matching placeholder by name/ref from localStorage
+                    const KEY2 = "IDEOGRAM_UPLOADED_MEDIA";
+                    try {
+                      const raw2 = localStorage.getItem(KEY2);
+                      const existing2 = raw2 ? JSON.parse(raw2) : [];
+                      const filtered = existing2.filter((p) => {
+                        const nameMatches = (p.fileName || p.MediaName || "") !== filename;
+                        const refMatches = p.MediaRef !== tmpRef;
+                        return nameMatches && refMatches;
+                      });
+                      localStorage.setItem(KEY2, JSON.stringify(filtered));
+                    } catch (e) { /* ignore */ }
+
+                    // final progress + complete event with server Details (server may return Details or Data)
+                    try { window.dispatchEvent(new CustomEvent("ideogram:uploadProgress", { detail: { progress: 100, placeholders: [placeholder] } })); } catch (e) {}
+                    try { window.dispatchEvent(new CustomEvent("ideogram:uploadComplete", { detail: { uploadedMedia: res.data.Details ? res.data.Details.Media || [] : [] } })); } catch (e) {}
+                    console.log("Split-screen uploaded to media successfully");
+                  } else {
+                    console.warn("Upload returned error:", res.data.Error);
+                  }
+                } finally {
+                  // free object URL after short delay
+                  setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 30000);
+                }
+              })
+              .catch((err) => {
+                console.error("Automatic upload failed:", err);
+                // cleanup placeholder on error (optional)
+                try {
+                  const KEY3 = "IDEOGRAM_UPLOADED_MEDIA";
+                  const raw3 = localStorage.getItem(KEY3);
+                  const existing3 = raw3 ? JSON.parse(raw3) : [];
+                  const filtered3 = existing3.filter((p) => p.MediaRef !== tmpRef);
+                  localStorage.setItem(KEY3, JSON.stringify(filtered3));
+                } catch (e) { /* ignore */ }
+              });
+          } catch (e) {
+            console.error("placeholder/upload flow failed", e);
+          }
         } catch (err) {
           console.error("Upload exception:", err);
         }

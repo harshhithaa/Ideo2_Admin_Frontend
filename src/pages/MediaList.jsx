@@ -447,13 +447,64 @@ const MediaList = (props) => {
     }
   }, []); // run once on mount
 
-  // Update render to show processing UI for placeholder items (MediaList already renders item.MediaPath etc.)
+  // listen for upload progress events (update placeholders' processingProgress)
+  useEffect(() => {
+    const progressHandler = (ev) => {
+      const { progress = 0, placeholders = [] } = ev?.detail || {};
+      if (!Array.isArray(placeholders) || placeholders.length === 0) {
+        // if no placeholders provided, just update any processing items to progress
+        setMedia((prev) => {
+          return (Array.isArray(prev) ? prev.map((m) => (m.isProcessing ? { ...m, processingProgress: progress } : m)) : prev);
+        });
+        return;
+      }
+
+      // update placeholders in state/ref by matching MediaRef or fileName
+      setMedia((prev) => {
+        let list = Array.isArray(prev) ? prev.slice() : [];
+        placeholders.forEach((ph) => {
+          const name = ph.fileName || ph.MediaName;
+          const tmpRef = ph.MediaRef;
+          const idx = list.findIndex((m) =>
+            m.MediaRef === tmpRef || (m.MediaName && name && m.MediaName === name) || (m.MediaPath && ph.fileUrl && m.MediaPath === ph.fileUrl)
+          );
+          if (idx !== -1) {
+            list[idx] = { ...list[idx], isProcessing: true, processingProgress: progress };
+          } else {
+            // if not yet in list, insert placeholder at top with progress
+            const newPh = {
+              MediaRef: tmpRef,
+              MediaName: name || 'Processing...',
+              MediaPath: ph.fileUrl || null,
+              Thumbnail: ph.fileUrl || null,
+              isProcessing: true,
+              processingProgress: progress
+            };
+            list.unshift(newPh);
+          }
+        });
+        return list;
+      });
+
+      // keep placeholdersRef in sync so pollForMedia won't re-add them
+      placeholdersRef.current = (placeholdersRef.current || []).slice();
+      placeholders.forEach((p) => {
+        const existing = placeholdersRef.current.find((x) => x.MediaRef === p.MediaRef || x.fileName === p.fileName);
+        if (!existing) placeholdersRef.current.push(p);
+      });
+    };
+
+    window.addEventListener('ideogram:uploadProgress', progressHandler);
+    return () => window.removeEventListener('ideogram:uploadProgress', progressHandler);
+  }, []);
+
   const renderMediaCard = (item) => {
     const src = buildSrc(item?.MediaPath);
     const thumb = buildSrc(item?.Thumbnail || item?.MediaThumb || item?.Poster);
     const rawType = (item?.MediaType || '').toString().toLowerCase();
 
     const isProcessing = item.isProcessing || item.processing || item.isProcessing === true;
+    const progressPct = Math.min(100, Number(item.processingProgress || 0));
 
     const isGif = rawType === 'gif';
     const isVideo = rawType === 'video';
@@ -479,9 +530,12 @@ const MediaList = (props) => {
           {isProcessing ? (
             <Box sx={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
               <Box sx={{ width: '80%', bgcolor: '#e0e0e0', height: 10, borderRadius: 2, overflow: 'hidden' }}>
-                <Box sx={{ width: '30%', height: '100%', bgcolor: '#5b67d6', transition: 'width 0.3s' }} />
+                <Box sx={{ width: `${progressPct}%`, height: '100%', bgcolor: '#5b67d6', transition: 'width 0.3s' }} />
               </Box>
-              <Typography variant="caption" color="text.secondary">Processing...</Typography>
+              {/* show only label (no percentage) */}
+              <Typography variant="caption" color="text.secondary">
+                {progressPct >= 100 ? 'Finalizing...' : 'Processing...'}
+              </Typography>
             </Box>
           ) : (
             isVideo ? (
