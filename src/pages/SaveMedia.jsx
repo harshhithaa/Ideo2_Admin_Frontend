@@ -301,12 +301,52 @@ function SaveMedia(props) {
     });
   };
 
+  // Update the saveMediaData function to include media type information
   function saveMediaData() {
     if (files.length === 0) {
       setSnackSeverity('error');
       setSnackMessage('Please select at least one file');
       setOpenSnackbar(true);
       return;
+    }
+
+    // ✅ Build placeholder metadata with correct media types
+    const placeholders = files.map((f) => {
+      const fileName = f.name || '';
+      const fileType = (f.type || '').toLowerCase();
+      
+      // Determine media type based on file extension and MIME type
+      let mediaType = 'image'; // default
+      
+      if (fileType.includes('gif') || fileName.toLowerCase().endsWith('.gif')) {
+        mediaType = 'gif';
+      } else if (fileType.startsWith('video/') || fileName.match(/\.(mp4|mov|avi|mkv|webm|ogg)$/i)) {
+        mediaType = 'video';
+      }
+      
+      return {
+        MediaRef: `tmp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        fileName: fileName,
+        fileUrl: f.preview || null,
+        fileMimetype: fileType,
+        mediaType: mediaType,
+        isProcessing: true,
+        processingProgress: 0
+      };
+    });
+
+    // ✅ CLEAR ANY EXISTING PLACEHOLDERS BEFORE SAVING NEW ONES
+    try {
+      localStorage.removeItem('IDEOGRAM_UPLOADED_MEDIA');
+    } catch (e) {
+      console.error('Error clearing old placeholders:', e);
+    }
+
+    // Store NEW placeholders in localStorage
+    try {
+      localStorage.setItem('IDEOGRAM_UPLOADED_MEDIA', JSON.stringify(placeholders));
+    } catch (e) {
+      console.error('Error saving placeholders to localStorage:', e);
     }
 
     // ✅ Determine and store media type before upload

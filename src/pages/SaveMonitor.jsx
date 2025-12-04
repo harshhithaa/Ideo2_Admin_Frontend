@@ -126,30 +126,32 @@ const SaveMonitorDetails = (props) => {
       setScheduleData(comp.scheduleList);
       setSchedule(comp.scheduleList);
     }
-  }, [props.component]);
+  }, [props.component]); // ✅ Add dependency to sync with Redux state
 
   useEffect(() => {
-    const data = {
-      componenttype: COMPONENTS.Playlist
-    };
-    const dataForSchedule = {
-      componenttype: COMPONENTS.Schedule
-    };
+    // ✅ Only fetch if data is not already loaded
+    if (playlistData.length === 0) {
+      const data = {
+        componenttype: COMPONENTS.Playlist
+      };
+      props.getUserComponentList(data, (err) => {
+        if (!err.exists) {
+          setloader(false);
+        }
+      });
+    }
 
-    props.getUserComponentList(data, (err) => {
-      if (!err.exists) {
-        // playlist will be set in props.component effect
-        setloader(false);
-      }
-    });
-
-    props.getUserComponentList(dataForSchedule, (err) => {
-      if (!err.exists) {
-        // schedule will be set in props.component effect
-        setScheduleloader(false);
-      }
-    });
-  }, [/* keep empty to only run once on mount */]);
+    if (scheduleData.length === 0) {
+      const dataForSchedule = {
+        componenttype: COMPONENTS.Schedule
+      };
+      props.getUserComponentList(dataForSchedule, (err) => {
+        if (!err.exists) {
+          setScheduleloader(false);
+        }
+      });
+    }
+  }, []); // ✅ Keep empty to run only once on mount
 
   // const saveData = () => {
   //   console.log(selectedSchedule);

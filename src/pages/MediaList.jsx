@@ -188,8 +188,13 @@ const MediaList = (props) => {
           setMedia((prev) => {
             // keep placeholders on top if any
             const placeholders = placeholdersRef.current || [];
-            const serverList = [];
-            return [...placeholders, ...serverList];
+            const filtered = placeholders.filter(p => 
+              p.MediaType === mediaType || 
+              (mediaType === 'image' && p.MediaType === 'image') ||
+              (mediaType === 'video' && p.MediaType === 'video') ||
+              (mediaType === 'gif' && p.MediaType === 'gif')
+            );
+            return filtered;
           });
 
           resolve({ componentList: [], totalRecords: 0, mediaType });
@@ -202,31 +207,55 @@ const MediaList = (props) => {
           ? Number(componentList[0].TotalRecords)
           : (data.TotalRecords || 0);
 
-        if (mediaType === 'image') { setImageTotalRecords(totalRecords); setImageTotalPages(Math.ceil(totalRecords / pageSize)); }
-        else if (mediaType === 'video') { setVideoTotalRecords(totalRecords); setVideoTotalPages(Math.ceil(totalRecords / pageSize)); }
-        else if (mediaType === 'gif') { setGifTotalRecords(totalRecords); setGifTotalPages(Math.ceil(totalRecords / pageSize)); }
+        if (mediaType === 'image') { 
+          setImageTotalRecords(totalRecords); 
+          setImageTotalPages(Math.ceil(totalRecords / pageSize)); 
+        }
+        else if (mediaType === 'video') { 
+          setVideoTotalRecords(totalRecords); 
+          setVideoTotalPages(Math.ceil(totalRecords / pageSize)); 
+        }
+        else if (mediaType === 'gif') { 
+          setGifTotalRecords(totalRecords); 
+          setGifTotalPages(Math.ceil(totalRecords / pageSize)); 
+        }
 
         // Merge placeholders with server list: placeholders not present on server remain on top
         const placeholders = placeholdersRef.current || [];
         const serverList = Array.isArray(componentList) ? componentList : [];
         const serverRefs = new Set(serverList.map((i) => i.MediaRef));
-        const missingPlaceholders = (placeholders || []).filter((p) => !serverRefs.has(p.MediaRef));
-        setMedia([...missingPlaceholders, ...serverList]);
+        
+        // Filter placeholders by current media type and exclude those already present on server
+        const relevantPlaceholders = placeholders.filter(p =>
+          p.MediaType === mediaType && !serverRefs.has(p.MediaRef)
+        );
+
+        // Deduplicate placeholders by MediaRef / fileKey
+        const placeholderMap = new Map();
+        relevantPlaceholders.forEach((p) => {
+          const key = p.fileKey || p.MediaRef || p.fileName || p.MediaName || p.MediaPath;
+          if (!placeholderMap.has(key)) placeholderMap.set(key, p);
+        });
+        const uniquePlaceholders = Array.from(placeholderMap.values());
+
+        // Merge without duplicates (server items take precedence)
+        const merged = [
+          ...uniquePlaceholders,
+          ...serverList
+        ].filter((item, idx, arr) => {
+          const key = item.MediaRef || item.MediaName || item.fileName || item.MediaPath;
+          return arr.findIndex(x => {
+            const kx = x.MediaRef || x.MediaName || x.fileName || x.MediaPath;
+            return kx && key && kx === key;
+          }) === idx;
+        });
+
+        setMedia(merged);
 
         resolve({ componentList: serverList, totalRecords, mediaType });
       });
     });
   };
-
-  // ✅ INITIAL LOAD - FETCH FOR RESTORED ACTIVE TAB
-  useEffect(() => {
-    let mediaType = '';
-    if (activeTab === 'IMAGES') mediaType = 'image';
-    else if (activeTab === 'VIDEOS') mediaType = 'video';
-    else if (activeTab === 'GIFS') mediaType = 'gif';
-
-    fetchMediaList(1, mediaType, '', { setDisplay: true });
-  }, []);
 
   // ✅ REFETCH WHEN TAB CHANGES -> display for that tab
   useEffect(() => {
@@ -425,79 +454,119 @@ const MediaList = (props) => {
   // -------------------------
   const placeholdersRef = useRef([]);
   useEffect(() => {
+    // ✅ ADD GUARD: Prevent running multiple times
+    if (placeholdersRef.current.length > 0) {
+      console.warn('Placeholders already loaded, skipping duplicate read');
+      return;
+    }
+
     try {
       const raw = localStorage.getItem(UPLOADED_MEDIA_KEY);
       if (raw) {
         const placeholders = JSON.parse(raw);
         if (Array.isArray(placeholders) && placeholders.length > 0) {
-          const phItems = placeholders.map((p) => ({
-            MediaRef: p.MediaRef || (`tmp_${Date.now()}_${Math.random().toString(36).substr(2,5)}`),
-            MediaName: p.fileName || p.MediaName || 'Processing...',
-            MediaPath: p.fileUrl || p.FileUrl || null,
-            Thumbnail: p.fileUrl || p.Thumbnail || null,
-            MediaType: p.fileMimetype || (p.fileUrl && p.fileUrl.toLowerCase().includes('.gif') ? 'gif' : 'image'),
-            isProcessing: true,
-            processingProgress: 0
-          }));
+          console.log(`Loading ${placeholders.length} placeholders from localStorage`);
+          
+          // Deduplicate by fileKey (fallback to MediaRef)
+          const seen = new Set();
+          const phItems = [];
+          placeholders.forEach((p) => {
+            const fileKey = p.fileKey || `${p.fileName || ''}_${p.fileSize || 0}_${p.fileLastModified || 0}`;
+            if (fileKey && seen.has(fileKey)) return;
+            if (fileKey) seen.add(fileKey);
 
+            // Determine media type from placeholder data
+            let mediaType = 'image';
+            const fileName = (p.fileName || '').toLowerCase();
+            const mimeType = (p.fileMimetype || '').toLowerCase();
+            
+            if (mimeType.includes('gif') || fileName.endsWith('.gif')) {
+              mediaType = 'gif';
+            } else if (mimeType.startsWith('video/') || fileName.match(/\.(mp4|mov|avi|mkv|webm|ogg)$/)) {
+              mediaType = 'video';
+            }
+
+            phItems.push({
+              MediaRef: p.MediaRef || (`tmp_${Date.now()}_${Math.random().toString(36).substr(2,5)}`),
+              MediaName: p.fileName || p.MediaName || 'Processing...',
+              MediaPath: p.fileUrl || p.FileUrl || null,
+              Thumbnail: p.fileUrl || p.Thumbnail || null,
+              MediaType: mediaType,
+              isProcessing: true,
+              processingProgress: p.processingProgress || 0,
+              fileName: p.fileName || null,
+              fileMimetype: p.fileMimetype || null,
+              fileKey: fileKey,
+              fileSize: p.fileSize || 0,
+              fileLastModified: p.fileLastModified || 0
+            });
+          });
+
+          // Only store placeholders in the ref - do NOT setMedia here.
           placeholdersRef.current = phItems;
-          // show placeholders immediately
-          setMedia((prev) => [...phItems, ...(Array.isArray(prev) ? prev : [])]);
-          // clear persisted placeholders so we don't reinsert later
+
+          // Clear persisted placeholders IMMEDIATELY after reading
           localStorage.removeItem(UPLOADED_MEDIA_KEY);
-          // start polling each placeholder for final DB record
-          phItems.forEach((it) => { if (it.MediaRef) pollForMedia(it.MediaRef); });
+          
+          // Start polling each placeholder so they are replaced when available on server
+          phItems.forEach((it) => {
+            if (it.MediaRef) pollForMedia(it.MediaRef);
+          });
         }
       }
     } catch (e) {
       console.error('Error reading uploaded placeholder from localStorage', e);
     }
-  }, []); // run once on mount
+  }, []); // run ONLY once on mount
 
   // listen for upload progress events (update placeholders' processingProgress)
   useEffect(() => {
     const progressHandler = (ev) => {
       const { progress = 0, placeholders = [] } = ev?.detail || {};
+      
+      // ✅ ONLY UPDATE EXISTING PLACEHOLDERS - DON'T CREATE NEW ONES
       if (!Array.isArray(placeholders) || placeholders.length === 0) {
-        // if no placeholders provided, just update any processing items to progress
         setMedia((prev) => {
-          return (Array.isArray(prev) ? prev.map((m) => (m.isProcessing ? { ...m, processingProgress: progress } : m)) : prev);
+          return (Array.isArray(prev) ? prev : []).map((item) => {
+            if (item.isProcessing) {
+              return { ...item, processingProgress: progress };
+            }
+            return item;
+          });
         });
         return;
       }
 
-      // update placeholders in state/ref by matching MediaRef or fileName
+      // Update placeholders in state by matching MediaRef or fileName
       setMedia((prev) => {
         let list = Array.isArray(prev) ? prev.slice() : [];
         placeholders.forEach((ph) => {
-          const name = ph.fileName || ph.MediaName;
-          const tmpRef = ph.MediaRef;
-          const idx = list.findIndex((m) =>
-            m.MediaRef === tmpRef || (m.MediaName && name && m.MediaName === name) || (m.MediaPath && ph.fileUrl && m.MediaPath === ph.fileUrl)
+          const idx = list.findIndex((m) => 
+            m.MediaRef === ph.MediaRef || 
+            (m.MediaName && ph.fileName && m.MediaName === ph.fileName)
           );
           if (idx !== -1) {
-            list[idx] = { ...list[idx], isProcessing: true, processingProgress: progress };
-          } else {
-            // if not yet in list, insert placeholder at top with progress
-            const newPh = {
-              MediaRef: tmpRef,
-              MediaName: name || 'Processing...',
-              MediaPath: ph.fileUrl || null,
-              Thumbnail: ph.fileUrl || null,
-              isProcessing: true,
+            // ✅ Only update progress - preserve all other fields including MediaType
+            list[idx] = { 
+              ...list[idx], 
               processingProgress: progress
             };
-            list.unshift(newPh);
           }
+          // ✅ REMOVED: Don't add new placeholders here - they're already added from localStorage
         });
         return list;
       });
 
-      // keep placeholdersRef in sync so pollForMedia won't re-add them
-      placeholdersRef.current = (placeholdersRef.current || []).slice();
-      placeholders.forEach((p) => {
-        const existing = placeholdersRef.current.find((x) => x.MediaRef === p.MediaRef || x.fileName === p.fileName);
-        if (!existing) placeholdersRef.current.push(p);
+      // ✅ UPDATE placeholdersRef WITHOUT ADDING NEW ENTRIES
+      // Only update progress for existing entries
+      placeholdersRef.current = (placeholdersRef.current || []).map((p) => {
+        const match = placeholders.find((ph) => 
+          p.MediaRef === ph.MediaRef || p.fileName === ph.fileName
+        );
+        if (match) {
+          return { ...p, processingProgress: progress };
+        }
+        return p;
       });
     };
 
