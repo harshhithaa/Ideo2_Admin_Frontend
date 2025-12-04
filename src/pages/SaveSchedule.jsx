@@ -52,9 +52,6 @@ const SaveScheduleDetails = (props) => {
   const [endTime, setEndTime] = useState(
     (state && state.EndTime && state.EndTime.slice(0, 5)) || ''
   );
-  const [fixedTimePlayback, setFixedTimePlayback] = useState(
-    (state && state.FixedTimePlayback) || false
-  );
   const [loading, setLoading] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
@@ -67,7 +64,7 @@ const SaveScheduleDetails = (props) => {
   // Add state for time validation error
   const [timeError, setTimeError] = useState('');
 
-  // Days state
+  // Days state (individual days)
   const [days, setDays] = useState({
     sunday: false,
     monday: false,
@@ -78,10 +75,21 @@ const SaveScheduleDetails = (props) => {
     saturday: false
   });
 
-  // Load existing days if editing
+  // Days mode: 'all' -> All Days, 'custom' -> Custom Days
+  const [daysMode, setDaysMode] = useState('all');
+
+  // Load existing days if editing and determine mode
   useEffect(() => {
     if (state && state.Days && Array.isArray(state.Days)) {
-      const newDays = { ...days };
+      const newDays = {
+        sunday: false,
+        monday: false,
+        tuesday: false,
+        wednesday: false,
+        thursday: false,
+        friday: false,
+        saturday: false
+      };
       state.Days.forEach((day) => {
         const dayLower = day.toLowerCase();
         if (dayLower in newDays) {
@@ -89,6 +97,22 @@ const SaveScheduleDetails = (props) => {
         }
       });
       setDays(newDays);
+
+      // Determine mode: if all 7 true -> all, else custom
+      const allSelected = Object.values(newDays).every(Boolean);
+      setDaysMode(allSelected ? 'all' : 'custom');
+    } else {
+      // default to All Days
+      setDaysMode('all');
+      setDays({
+        sunday: true,
+        monday: true,
+        tuesday: true,
+        wednesday: true,
+        thursday: true,
+        friday: true,
+        saturday: true
+      });
     }
   }, []);
 
@@ -124,8 +148,38 @@ const SaveScheduleDetails = (props) => {
     setDays(next);
   };
 
-  // Validation - all fields must be filled and at least one day selected
+  // When daysMode changes to 'all', mark all days selected; when 'custom' clear all selections
+  const handleDaysModeChange = (e) => {
+    const mode = e.target.value;
+    setDaysMode(mode);
+
+    if (mode === 'all') {
+      setDays({
+        sunday: true,
+        monday: true,
+        tuesday: true,
+        wednesday: true,
+        thursday: true,
+        friday: true,
+        saturday: true
+      });
+    } else {
+      // NEW BEHAVIOR: when switching to 'custom' clear all selections so user must pick explicitly
+      setDays({
+        sunday: false,
+        monday: false,
+        tuesday: false,
+        wednesday: false,
+        thursday: false,
+        friday: false,
+        saturday: false
+      });
+    }
+  };
+
+  // Validation - all fields must be filled and at least one day selected (if custom)
   const isFormValid = () => {
+    const daysValid = daysMode === 'all' ? true : selectedDaysArray.length > 0;
     return (
       title.trim() !== '' &&
       description.trim() !== '' &&
@@ -134,7 +188,7 @@ const SaveScheduleDetails = (props) => {
       startTime !== '' &&
       endTime !== '' &&
       selectedPlaylist !== '' &&
-      selectedDaysArray.length > 0 &&
+      daysValid &&
       !timeError
     );
   };
@@ -148,7 +202,7 @@ const SaveScheduleDetails = (props) => {
 
     setLoading(true);
 
-    const selectedDays = Object.keys(days).filter((k) => days[k]);
+    const selectedDays = daysMode === 'all' ? daysKeys : Object.keys(days).filter((k) => days[k]);
 
     const payload = {
       scheduleRef: scheduleRef || null,
@@ -156,7 +210,6 @@ const SaveScheduleDetails = (props) => {
       description: description || null,
       playlistRef: selectedPlaylist || null,
       monitorRef: null,
-      fixedTimePlayback: fixedTimePlayback ? 1 : 0,
       isActive: 1,
       schedule: {
         StartTime: startTime || null,
@@ -347,10 +400,10 @@ const SaveScheduleDetails = (props) => {
                 />
               </Grid>
 
-              {/* Row 4 — Playlist & Fixed Time Playback */}
+              {/* Row 4 — Playlist (left) & Days dropdown (right) */}
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth size="medium" required>
-                  <InputLabel id="playlist-label" shrink sx={labelSx}>
+                  <InputLabel id="playlist-label" sx={labelSx} shrink>
                     Playlist
                   </InputLabel>
                   <Select
@@ -376,80 +429,89 @@ const SaveScheduleDetails = (props) => {
                 </FormControl>
               </Grid>
 
-              <Grid item xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
+              <Grid item xs={12} md={6}>
                 <FormControl fullWidth size="medium" required>
-                  <InputLabel id="fixed-label" shrink sx={labelSx}>
-                    Fixed Time Playback
+                  <InputLabel id="days-mode-label" sx={labelSx} shrink>
+                    Days
                   </InputLabel>
                   <Select
-                    labelId="fixed-label"
-                    id="fixed-select"
-                    value={fixedTimePlayback ? 'yes' : 'no'}
-                    label="Fixed Time Playback"
-                    onChange={(e) => setFixedTimePlayback(e.target.value === 'yes')}
+                    labelId="days-mode-label"
+                    id="days-mode-select"
+                    value={daysMode}
+                    label="Days"
+                    onChange={handleDaysModeChange}
                   >
-                    <MenuItem value="no">No</MenuItem>
-                    <MenuItem value="yes">Yes</MenuItem>
+                    <MenuItem value="all">All Days</MenuItem>
+                    <MenuItem value="custom">Custom Days</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
 
-              {/* Days — centered heading + single-row toggle buttons */}
-              <Grid item xs={12}>
-                <Typography
-                  variant="subtitle1"
-                  align="center"
-                  gutterBottom
-                  sx={{ fontWeight: 700, fontSize: '1.05rem' }}
-                >
-                  Days *
-                </Typography>
+              {/* Day buttons row — only visible when custom selected */}
+              {daysMode === 'custom' && (
+                <Grid item xs={12}>
+                  <Typography
+                    variant="subtitle1"
+                    align="center"
+                    gutterBottom
+                    sx={{ fontWeight: 650, fontSize: '1rem' }}
+                  >
+                    Select Days
+                  </Typography>
 
-                <Box
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    px: 1,
-                    overflowX: { xs: 'auto', md: 'hidden' }
-                  }}
-                >
-                  <ToggleButtonGroup
-                    value={selectedDaysArray}
-                    onChange={handleDaysToggle}
-                    aria-label="days"
-                    size="small"
+                  <Box
                     sx={{
-                      flexWrap: 'nowrap',
-                      gap: 1,
-                      '& .MuiToggleButton-root': {
-                        borderRadius: 2,
-                        border: `1px solid ${theme.palette.divider}`,
-                        textTransform: 'none',
-                        px: 2,
-                        py: 1,
-                        minWidth: 92,
-                        fontSize: '0.98rem'
-                      },
-                      '& .MuiToggleButton-root.Mui-selected': {
-                        bgcolor: theme.palette.primary.main,
-                        color: theme.palette.primary.contrastText,
-                        borderColor: theme.palette.primary.main,
-                        '&:hover': {
-                          bgcolor: theme.palette.primary.dark
-                        }
-                      }
+                      display: 'flex',
+                      justifyContent: 'center',
+                      px: 1,
+                      overflowX: { xs: 'auto', md: 'hidden' }
                     }}
                   >
-                    <ToggleButton value="sunday" aria-label="Sunday">Sunday</ToggleButton>
-                    <ToggleButton value="monday" aria-label="Monday">Monday</ToggleButton>
-                    <ToggleButton value="tuesday" aria-label="Tuesday">Tuesday</ToggleButton>
-                    <ToggleButton value="wednesday" aria-label="Wednesday">Wednesday</ToggleButton>
-                    <ToggleButton value="thursday" aria-label="Thursday">Thursday</ToggleButton>
-                    <ToggleButton value="friday" aria-label="Friday">Friday</ToggleButton>
-                    <ToggleButton value="saturday" aria-label="Saturday">Saturday</ToggleButton>
-                  </ToggleButtonGroup>
-                </Box>
-              </Grid>
+                    <ToggleButtonGroup
+                      value={selectedDaysArray}
+                      onChange={handleDaysToggle}
+                      aria-label="days"
+                      size="small"
+                      sx={{
+                        flexWrap: 'nowrap',
+                        gap: 1,
+                        '& .MuiToggleButton-root': {
+                          borderRadius: 2,
+                          border: `1px solid ${theme.palette.divider}`,
+                          textTransform: 'none',
+                          px: 2,
+                          py: 1,
+                          minWidth: 92,
+                          fontSize: '0.98rem'
+                        },
+                        '& .MuiToggleButton-root.Mui-selected': {
+                          bgcolor: theme.palette.primary.main,
+                          color: theme.palette.primary.contrastText,
+                          borderColor: theme.palette.primary.main,
+                          '&:hover': {
+                            bgcolor: theme.palette.primary.dark
+                          }
+                        }
+                      }}
+                    >
+                      <ToggleButton value="sunday" aria-label="Sunday">Sunday</ToggleButton>
+                      <ToggleButton value="monday" aria-label="Monday">Monday</ToggleButton>
+                      <ToggleButton value="tuesday" aria-label="Tuesday">Tuesday</ToggleButton>
+                      <ToggleButton value="wednesday" aria-label="Wednesday">Wednesday</ToggleButton>
+                      <ToggleButton value="thursday" aria-label="Thursday">Thursday</ToggleButton>
+                      <ToggleButton value="friday" aria-label="Friday">Friday</ToggleButton>
+                      <ToggleButton value="saturday" aria-label="Saturday">Saturday</ToggleButton>
+                    </ToggleButtonGroup>
+                  </Box>
+
+                  {/* validation helper when custom mode and no day selected */}
+                  {selectedDaysArray.length === 0 && (
+                    <Typography align="center" sx={{ color: 'error.main', mt: 1, fontSize: 13 }}>
+                      Please select at least one day.
+                    </Typography>
+                  )}
+                </Grid>
+              )}
 
               {/* Buttons */}
               <Grid item xs={12}>

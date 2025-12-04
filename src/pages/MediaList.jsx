@@ -103,6 +103,13 @@ const MediaList = (props) => {
   const [boxMessage, setboxMessage] = useState('');
   const [color, setcolor] = useState('success');
 
+  // Auto-dismiss top-centered notification for success messages
+  useEffect(() => {
+    if (!box) return undefined;
+    const timer = setTimeout(() => setbox(false), 1500); // auto-dismiss after 1.5s
+    return () => clearTimeout(timer);
+  }, [box]);
+
   // ✅ CLEAR NAVIGATION STATE AFTER READING IT (only when coming from upload)
   useEffect(() => {
     if (location.state?.fromUpload) {
@@ -614,8 +621,21 @@ const MediaList = (props) => {
       <Helmet><title>Media | Ideogram</title></Helmet>
 
       {box && (
-        <Stack sx={{ position: 'fixed', top: 10, left: 870, zIndex: 9999, width: 'auto', maxWidth: 400 }} spacing={2}>
-          <Alert severity={color} onClose={() => setbox(false)}>{boxMessage}</Alert>
+        <Stack
+          sx={{
+            position: 'fixed',
+            top: 10,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+            width: 'auto',
+            maxWidth: 400
+          }}
+          spacing={2}
+        >
+          <Alert severity={color}>
+            {boxMessage}
+          </Alert>
         </Stack>
       )}
 

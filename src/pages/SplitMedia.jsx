@@ -541,6 +541,38 @@ const SplitScreenApp = () => {
     });
   };
 
+  // Derived validation: whether save button should be enabled
+  const selectedModelObj = MODELS.find((m) => m.id === selectedModel) || null;
+  const totalSlots = selectedModelObj ? selectedModelObj.blocksX * selectedModelObj.blocksY : 0;
+
+  const countFilledSlots = (() => {
+    if (!placedAssignments || !selectedModelObj) return 0;
+    let count = 0;
+    for (let i = 0; i < totalSlots; i++) {
+      if (placedAssignments[i]) count++;
+    }
+    return count;
+  })();
+
+  const allSlotsFilled = totalSlots > 0 && countFilledSlots === totalSlots;
+  const nameValid = (splitName || "").trim().length > 0;
+  const orientationSelected = !!orientation;
+  const gridSelected = !!selectedModel;
+
+  const isReadyForSave = orientationSelected && gridSelected && nameValid && allSlotsFilled;
+
+  const getMissingReasons = () => {
+    const reasons = [];
+    if (!orientationSelected) reasons.push("Orientation not selected");
+    if (!gridSelected) reasons.push("Grid matrix not selected");
+    if (!nameValid) reasons.push("Split screen name is empty");
+    if (!allSlotsFilled) {
+      const missing = totalSlots - countFilledSlots;
+      reasons.push(`${missing} preview slot${missing === 1 ? "" : "s"} empty`);
+    }
+    return reasons;
+  };
+
   return (
     <>
       <Dialog
@@ -849,6 +881,8 @@ const SplitScreenApp = () => {
 
                <button
                  id="btn-download"
+                 disabled={!isReadyForSave}
+                 title={!isReadyForSave ? getMissingReasons().join(" · ") : "Download & Upload to Media"}
                  style={{
                    width: "100%",
                    padding: "10px",
@@ -858,12 +892,20 @@ const SplitScreenApp = () => {
                    color: "#fff",
                    fontSize: "13px",
                    fontWeight: "600",
-                   cursor: "pointer",
+                   cursor: isReadyForSave ? "pointer" : "not-allowed",
                    alignSelf: "stretch",
+                   opacity: isReadyForSave ? 1 : 0.55,
                  }}
                >
                  {`Download & Upload to Media${splitName ? ` as "${splitName.trim()}.png"` : ""}`}
                </button>
+
+               {/* helper text when disabled listing missing items */}
+               {!isReadyForSave && (
+                 <div style={{ marginTop: 8, fontSize: 12, color: "#6b7280" }} aria-hidden>
+                   {getMissingReasons().join(" · ")}
+                 </div>
+               )}
              </div>
           </div>
 
