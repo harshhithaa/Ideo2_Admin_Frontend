@@ -383,10 +383,12 @@ const CreatePlaylist = (props) => {
     }
   }, [type, state]);
 
+  const isViewMode = type === 'View';
+
   return (
     <>
       <Helmet>
-        <title>Create Playlist | Ideogram</title>
+        <title>{type} Playlist | Ideogram</title>
       </Helmet>
 
       {box && (
@@ -453,6 +455,7 @@ const CreatePlaylist = (props) => {
                           onChange={(e) => setTitle(e.target.value)}
                           value={title}
                           variant="outlined"
+                          disabled={isViewMode}
                           InputLabelProps={{ sx: { color: 'text.primary', fontWeight: 550, fontSize: '1rem' } }}
                           sx={{ '& .MuiInputBase-input': { color: 'text.primary', fontSize: '1rem', lineHeight: 1.2 }, mt: 0.5 }}
                         />
@@ -470,6 +473,7 @@ const CreatePlaylist = (props) => {
                           onChange={(e) => setDescription(e.target.value)}
                           value={description}
                           variant="outlined"
+                          disabled={isViewMode}
                           InputLabelProps={{ sx: { color: 'text.primary', fontWeight: 550, fontSize: '1rem' } }}
                           sx={{ '& .MuiInputBase-input': { color: 'text.primary', fontSize: '1rem', lineHeight: 1.2 }, mt: 0.5 }}
                         />
@@ -477,7 +481,7 @@ const CreatePlaylist = (props) => {
 
                       {/* Duration mode controls */}
                       <Grid item xs={12} md={4}>
-                        <FormControl fullWidth size="small" margin="dense">
+                        <FormControl fullWidth size="small" margin="dense" disabled={isViewMode}>
                           <InputLabel id="duration-mode-label">Duration Mode</InputLabel>
                           <Select
                             labelId="duration-mode-label"
@@ -491,7 +495,7 @@ const CreatePlaylist = (props) => {
                         </FormControl>
 
                         {durationMode === 'Default' && (
-                          <FormControl fullWidth size="small" margin="dense">
+                          <FormControl fullWidth size="small" margin="dense" disabled={isViewMode}>
                             <InputLabel id="default-duration-label">Default Duration</InputLabel>
                             <Select
                               labelId="default-duration-label"
@@ -500,9 +504,8 @@ const CreatePlaylist = (props) => {
                               onChange={(e) => setDefaultDuration(Number(e.target.value))}
                               sx={{ mt: 0.5 }}
                             >
-                              {/* Start from 10 seconds (removed 5 seconds option) */}
                               {Array.from({ length: 11 }).map((_, i) => {
-                                const val = (i + 2) * 5; // Starts at 10 (2*5), goes to 60 (12*5)
+                                const val = (i + 2) * 5;
                                 return <MenuItem key={val} value={val}>{val} sec</MenuItem>;
                               })}
                             </Select>
@@ -512,65 +515,60 @@ const CreatePlaylist = (props) => {
                     </Grid>
                   </Box>
 
-                  {/* Media area - match Media page styling exactly */}
-                  <Box sx={{ pt: 1, pb: 1 }}>
-                    {/* content wrapper matched to MediaList/MediaGrid */ }
-                    <Box sx={{
-                      borderRadius: `${panelRadius}px`,
-                      backgroundColor: panelBg,
-                      p: 1,
-                      position: 'relative',
-                      border: `1px solid ${panelBorder}`,
-                      mt: 0,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      // limit panel overall height and allow the inner grid to scroll
-                      maxHeight: '60vh',
-                      boxSizing: 'border-box',
-                      minHeight: 'auto'
-                    }}>
-                      {/* Tabs for Images / Videos like Media page */}
-                      <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
-                        <Box sx={{ flex: 1 }} />
+                  {/* Media area - hide in view mode */}
+                  {!isViewMode && (
+                    <Box sx={{ pt: 1, pb: 1 }}>
+                      <Box sx={{
+                        borderRadius: `${panelRadius}px`,
+                        backgroundColor: panelBg,
+                        p: 1,
+                        position: 'relative',
+                        border: `1px solid ${panelBorder}`,
+                        mt: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        maxHeight: '60vh',
+                        boxSizing: 'border-box',
+                        minHeight: 'auto'
+                      }}>
+                        <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+                          <Box sx={{ flex: 1 }} />
 
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          <Button variant={mediaTypeFilter === 'image' ? 'contained' : 'outlined'} onClick={() => { setMediaTypeFilter('image'); }}>
-                            IMAGES
-                          </Button>
-                          <Button variant={mediaTypeFilter === 'video' ? 'contained' : 'outlined'} onClick={() => { setMediaTypeFilter('video'); }}>
-                            VIDEOS
-                          </Button>
-                          {/* ✅ ADD GIF BUTTON */}
-                          <Button variant={mediaTypeFilter === 'gif' ? 'contained' : 'outlined'} onClick={() => { setMediaTypeFilter('gif'); }}>
-                            GIFS
-                          </Button>
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Button variant={mediaTypeFilter === 'image' ? 'contained' : 'outlined'} onClick={() => { setMediaTypeFilter('image'); }}>
+                              IMAGES
+                            </Button>
+                            <Button variant={mediaTypeFilter === 'video' ? 'contained' : 'outlined'} onClick={() => { setMediaTypeFilter('video'); }}>
+                              VIDEOS
+                            </Button>
+                            <Button variant={mediaTypeFilter === 'gif' ? 'contained' : 'outlined'} onClick={() => { setMediaTypeFilter('gif'); }}>
+                              GIFS
+                            </Button>
+                          </Box>
+
+                          <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                            <TextField
+                              size="small"
+                              placeholder="Search media"
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              sx={{ width: 240 }}
+                            />
+                          </Box>
                         </Box>
 
-                        <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
-                          <TextField
-                            size="small"
-                            placeholder="Search media"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            sx={{ width: 240 }}
-                          />
+                        <Box sx={{ flex: 1, overflowY: 'auto', pr: 0.5 }}>
+                          <MediaGrid media={media} setselected={onGridSelectionChange} selected={selectedRefs} columns={6} />
+                        </Box>
+
+                        <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                          <Button disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>Prev</Button>
+                          <Typography variant="body2">Page {currentPage} — {totalRecords} items</Typography>
+                          <Button disabled={(currentPage * pageSize) >= totalRecords} onClick={() => setCurrentPage((p) => p + 1)}>Next</Button>
                         </Box>
                       </Box>
-
-                      {/* Reuse MediaGrid (same component used on Media page).
-                          Inner scroller keeps pagination visible at the panel bottom. */}
-                      <Box sx={{ flex: 1, overflowY: 'auto', pr: 0.5 }}>
-                        <MediaGrid media={media} setselected={onGridSelectionChange} selected={selectedRefs} columns={6} />
-                      </Box>
-
-                      {/* simple footer pagination controls kept visible below the scrolling grid */}
-                      <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                        <Button disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>Prev</Button>
-                        <Typography variant="body2">Page {currentPage} — {totalRecords} items</Typography>
-                        <Button disabled={(currentPage * pageSize) >= totalRecords} onClick={() => setCurrentPage((p) => p + 1)}>Next</Button>
-                      </Box>
-                     </Box>
-                   </Box>
+                    </Box>
+                  )}
 
                   {/* Selection summary / badges with duration controls */}
                   <Box sx={{ mt: 1, mb: 1 }}>
@@ -642,7 +640,7 @@ const CreatePlaylist = (props) => {
                                   ) : (
                                     <>
                                       {/* Custom mode — fully editable with +/- */}
-                                      <IconButton size="small" onClick={() => adjustDuration(p.MediaRef, -1)}>
+                                      <IconButton size="small" onClick={() => adjustDuration(p.MediaRef, -1)} disabled={isViewMode}>
                                         <RemoveIcon fontSize="small" />
                                       </IconButton>
 
@@ -652,9 +650,10 @@ const CreatePlaylist = (props) => {
                                         onChange={(e) => onDurationInputChange(p.MediaRef, e.target.value)}
                                         onBlur={() => onDurationBlur(p.MediaRef)}
                                         inputProps={{ style: { width: 44, textAlign: 'center' } }}
+                                        disabled={isViewMode}
                                       />
 
-                                      <IconButton size="small" onClick={() => adjustDuration(p.MediaRef, +1)}>
+                                      <IconButton size="small" onClick={() => adjustDuration(p.MediaRef, +1)} disabled={isViewMode}>
                                         <AddIcon fontSize="small" />
                                       </IconButton>
                                     </>
@@ -664,9 +663,11 @@ const CreatePlaylist = (props) => {
                                 <Typography variant="body2" sx={{ color: 'text.secondary', mr: 1, flexShrink: 0 }}>Plays full video</Typography>
                               )}
 
-                              <IconButton color="error" onClick={() => removeSelection(p.SelectionId)} sx={{ flexShrink: 0 }}>
-                                <RemoveCircleOutlineIcon />
-                              </IconButton>
+                              {!isViewMode && (
+                                <IconButton color="error" onClick={() => removeSelection(p.SelectionId)} sx={{ flexShrink: 0 }}>
+                                  <RemoveCircleOutlineIcon />
+                                </IconButton>
+                              )}
                             </Box>
                           </Grid>
                         );
@@ -674,18 +675,30 @@ const CreatePlaylist = (props) => {
                     </Grid>
                   </Box>
    
-                  {/* existing primary action kept here — fully outside the media panel, non-overlapping */}
+                  {/* Action button - change based on mode */}
                   <Box sx={{ mt: 0.5, mb: 8.5, display: 'flex', justifyContent: 'center' }}>
-                    <Button
-                      color="primary"
-                      size="large"
-                      type="button"
-                      variant="contained"
-                      onClick={() => savePlaylistDetails()}
-                      disabled={!title || title.toString().trim() === ''}
-                    >
-                      {type} Playlist
-                    </Button>
+                    {isViewMode ? (
+                      <Button
+                        color="primary"
+                        size="large"
+                        type="button"
+                        variant="contained"
+                        onClick={() => navigate('/app/playlists')}
+                      >
+                        Back to PlaylistList
+                      </Button>
+                    ) : (
+                      <Button
+                        color="primary"
+                        size="large"
+                        type="button"
+                        variant="contained"
+                        onClick={() => savePlaylistDetails()}
+                        disabled={!title || title.toString().trim() === ''}
+                      >
+                        {type} Playlist
+                      </Button>
+                    )}
                   </Box>
                 </form>
               )}

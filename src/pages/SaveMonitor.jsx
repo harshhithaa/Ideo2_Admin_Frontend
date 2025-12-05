@@ -95,6 +95,10 @@ const SaveMonitorDetails = (props) => {
       ? 'Update'
       : 'Create'
   );
+
+  // Add isViewMode check
+  const isViewMode = type === 'View';
+
   let [box, setbox] = useState(false);
   let [boxMessage, setboxMessage] = useState('');
   let [color, setcolor] = useState('success');
@@ -391,7 +395,6 @@ const SaveMonitorDetails = (props) => {
           </Alert>
         </Snackbar>
 
-        {/* Centered content area with equal horizontal margins and lifted heading */}
         <Container
           maxWidth="md"
           sx={{
@@ -403,7 +406,6 @@ const SaveMonitorDetails = (props) => {
             boxSizing: 'border-box'
           }}
         >
-          {/* Constrain form width and visually separate from page edges */}
           <Box
             sx={{
               width: '100%',
@@ -433,15 +435,13 @@ const SaveMonitorDetails = (props) => {
               {({ errors, handleBlur, handleSubmit, isSubmitting, touched }) => (
                 <form onSubmit={handleSubmit}>
                   <Box sx={{ mb: 3, mt: 1 }}>
-                    {/* Heading moved slightly down, now centered */}
                     <Typography color="textPrimary" variant="h4" sx={{ fontWeight: 700, textAlign: 'center' }}>
                       {type} Monitor
                     </Typography>
                   </Box>
 
-                  {/* Use a vertical stack via Box with consistent spacing for controls.
-                      All controls share the same visual width via controlWidth. */}
                   <Box sx={{ display: 'grid', gap: 2, justifyItems: 'center' }}>
+                    {/* Title field - disabled in view mode */}
                     <Box sx={{ width: controlWidth }}>
                       <TextField
                         error={Boolean(touched.title && errors.title)}
@@ -456,9 +456,11 @@ const SaveMonitorDetails = (props) => {
                         variant="outlined"
                         size="small"
                         InputLabelProps={{ sx: { fontWeight: 600 } }}
+                        disabled={isViewMode}
                       />
                     </Box>
 
+                    {/* Description field - disabled in view mode */}
                     <Box sx={{ width: controlWidth }}>
                       <TextField
                         error={Boolean(touched.description && errors.description)}
@@ -473,16 +475,17 @@ const SaveMonitorDetails = (props) => {
                         variant="outlined"
                         size="small"
                         InputLabelProps={{ sx: { fontWeight: 600 } }}
+                        disabled={isViewMode}
                       />
                     </Box>
 
+                    {/* Default Playlist - read-only box in view mode */}
                     <Box sx={{ width: controlWidth }}>
                       <InputLabel id="select-playlist" sx={{ fontWeight: 600, mb: 1, display: 'block' }}>
                         Default Playlist
                       </InputLabel>
 
-                      {/* In View mode show a read-only boxed value (no dropdown). Otherwise keep Select unchanged. */}
-                      {state && state.type === 'View' ? (
+                      {isViewMode ? (
                         <Box
                           sx={{
                             height: 40,
@@ -494,7 +497,8 @@ const SaveMonitorDetails = (props) => {
                             width: '100%',
                             boxSizing: 'border-box',
                             display: 'flex',
-                            alignItems: 'center'
+                            alignItems: 'center',
+                            bgcolor: 'action.disabledBackground'
                           }}
                         >
                           <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -528,12 +532,12 @@ const SaveMonitorDetails = (props) => {
                       )}
                     </Box>
 
-                    {/* Orientation moved above Schedule */}
+                    {/* Orientation - read-only box in view mode */}
                     <Box sx={{ width: controlWidth }}>
                       <InputLabel id="select-orientation" sx={{ fontWeight: 600, mb: 1 }}>
                         Select Orientation
                       </InputLabel>
-                      {state && state.type === 'View' ? (
+                      {isViewMode ? (
                         <Box
                           sx={{
                             height: 40,
@@ -545,7 +549,8 @@ const SaveMonitorDetails = (props) => {
                             width: '100%',
                             boxSizing: 'border-box',
                             display: 'flex',
-                            alignItems: 'center'
+                            alignItems: 'center',
+                            bgcolor: 'action.disabledBackground'
                           }}
                         >
                           <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -572,16 +577,13 @@ const SaveMonitorDetails = (props) => {
                       )}
                     </Box>
 
-                    {/* Schedule remains at the bottom and aligned with other controls */}
+                    {/* Schedule - read-only chips in view mode */}
                     <Box sx={{ width: controlWidth }}>
                       <InputLabel id="select-schedule" sx={{ fontWeight: 600, mb: 1 }}>
                         Schedule
                       </InputLabel>
 
-                      {/* If View mode, show read-only chips (no dropdown). Otherwise keep existing Select. */}
-                      {state && state.type === 'View' ? (
-                        // keep the same boxed appearance as the editable Select field,
-                        // without changing chip styles or layout
+                      {isViewMode ? (
                         <Box
                           sx={{
                             height: 135,
@@ -593,7 +595,8 @@ const SaveMonitorDetails = (props) => {
                             width: '100%',
                             boxSizing: 'border-box',
                             display: 'flex',
-                            alignItems: 'flex-start'
+                            alignItems: 'flex-start',
+                            bgcolor: 'action.disabledBackground'
                           }}
                         >
                           <div
@@ -608,11 +611,11 @@ const SaveMonitorDetails = (props) => {
                               width: '100%'
                             }}
                           >
-                            {selectedSchedule && selectedSchedule.length > 0 ? (
-                              selectedSchedule.map((value, index) => (
+                            {selectedScheduleObjects && selectedScheduleObjects.length > 0 ? (
+                              selectedScheduleObjects.map((value, index) => (
                                 <div key={index} style={{ width: '90%' }}>
                                   <Chip
-                                    label={`${value.Title} (${value.StartTime} - ${value.EndTime}) (${value.StartDate} - ${value.EndDate})`}
+                                    label={`${value.Title} (${value.StartTime || ''} - ${value.EndTime || ''}) (${value.StartDate || ''} - ${value.EndDate || ''})`}
                                     style={{
                                       margin: 2,
                                       width: '100%',
@@ -759,19 +762,31 @@ const SaveMonitorDetails = (props) => {
                       )}
                     </Box>
 
+                    {/* Action button - change based on mode */}
                     <Box sx={{ py: 2 }}>
-                      <Button
-                        color="primary"
-                        fullWidth
-                        size="large"
-                        variant="contained"
-                        onClick={() => {
-                          handleDateAndTime();
-                        }}
-                        /* slide interval removed: always enabled (can add validation later) */
-                      >
-                        {type} Monitor
-                      </Button>
+                      {isViewMode ? (
+                        <Button
+                          color="primary"
+                          fullWidth
+                          size="large"
+                          variant="contained"
+                          onClick={() => navigate('/app/monitors')}
+                        >
+                          Back to Monitor List
+                        </Button>
+                      ) : (
+                        <Button
+                          color="primary"
+                          fullWidth
+                          size="large"
+                          variant="contained"
+                          onClick={() => {
+                            handleDateAndTime();
+                          }}
+                        >
+                          {type} Monitor
+                        </Button>
+                      )}
                     </Box>
                   </Box>
                 </form>

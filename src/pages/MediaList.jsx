@@ -815,7 +815,7 @@ const MediaList = (props) => {
                           disabled={selected.length === 0}
                           variant="outlined"
                           color="error"
-                          startIcon={<SvgIcon fontSize="small"><Trash2Icon /></SvgIcon>}
+                          startIcon={<SvgIcon fontSize="small" color="error"><Trash2Icon /></SvgIcon>}
                         >
                           Delete
                         </Button>
@@ -828,7 +828,7 @@ const MediaList = (props) => {
                       disabled={selected.length === 0}
                       variant="outlined"
                       color="error"
-                      startIcon={<SvgIcon fontSize="small"><Trash2Icon /></SvgIcon>}
+                      startIcon={<SvgIcon fontSize="small" color="error"><Trash2Icon /></SvgIcon>}
                     >
                       Delete
                     </Button>
