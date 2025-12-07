@@ -15,7 +15,9 @@ import {
   TablePagination,
   TableRow,
   Typography,
-  SvgIcon
+  SvgIcon,
+  Chip,
+  Tooltip
 } from '@mui/material';
 import PropTypes from 'prop-types';
 
@@ -66,6 +68,141 @@ const MonitorListResults = (props) => {
     setSelectedMonitorRefs(newSelectedMonitorRefs);
   };
 
+  // Render scheduled playlists cell (copied from reference, exact styling & tooltip)
+  const renderScheduledPlaylists = (monitor) => {
+    // Normalize schedules: accept null/undefined/empty/array; filter falsy entries
+    let schedules = [];
+    if (Array.isArray(monitor.Schedules)) {
+      schedules = monitor.Schedules.filter(Boolean);
+    } else if (monitor.ScheduleList && Array.isArray(monitor.ScheduleList)) {
+      schedules = monitor.ScheduleList.filter(Boolean);
+    }
+
+    // If no valid schedules -> explicit "No Schedules"
+    if (!schedules || schedules.length === 0) {
+      return (
+        <Typography
+          variant="body2"
+          sx={{
+            color: 'text.secondary',
+            fontStyle: 'italic',
+            fontSize: '0.9rem'
+          }}
+        >
+          No Schedules
+        </Typography>
+      );
+    }
+
+    // helper to pick schedule name from multiple possible properties
+    const getScheduleName = (s) => {
+      return s?.Title || s?.ScheduleName || s?.Name || s?.title || 'Untitled Schedule';
+    };
+
+    // Single schedule -> show chip + tooltip with name + details
+    if (schedules.length === 1) {
+      const schedule = schedules[0];
+      const name = getScheduleName(schedule);
+
+      return (
+        <Tooltip
+          title={
+            <Box sx={{ p: 0.5, maxHeight: '400px', overflowY: 'auto' }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>
+                {name}
+              </Typography>
+              <Typography variant="caption" sx={{ display: 'block' }}>
+                Time: {schedule?.StartTime || 'N/A'} - {schedule?.EndTime || 'N/A'}
+              </Typography>
+              <Typography variant="caption" sx={{ display: 'block' }}>
+                Dates: {schedule?.StartDate || 'N/A'} to {schedule?.EndDate || 'N/A'}
+              </Typography>
+              {schedule?.Days && (
+                <Typography variant="caption" sx={{ display: 'block' }}>
+                  Days: {Array.isArray(schedule.Days) ? schedule.Days.join(', ') : schedule.Days}
+                </Typography>
+              )}
+            </Box>
+          }
+          arrow
+          placement="bottom"
+        >
+          <Chip
+            label={name}
+            size="small"
+            sx={{
+              bgcolor: '#e3f2fd',
+              color: '#1976d2',
+              fontWeight: 500,
+              cursor: 'pointer',
+              maxWidth: '180px',
+              '&:hover': {
+                bgcolor: '#bbdefb'
+              }
+            }}
+          />
+        </Tooltip>
+      );
+    }
+
+    // Multiple schedules -> show count chip with detailed tooltip including names
+    return (
+      <Tooltip
+        title={
+          <Box sx={{ p: 0.5, maxHeight: '400px', overflowY: 'auto' }}>
+            <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 1 }}>
+              Assigned Schedules:
+            </Typography>
+            {schedules.map((schedule, idx) => {
+              const name = getScheduleName(schedule);
+              return (
+                <Box
+                  key={idx}
+                  sx={{
+                    mb: 1,
+                    pb: 1,
+                    borderBottom: idx < schedules.length - 1 ? '1px solid rgba(255,255,255,0.2)' : 'none'
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>
+                    {name}
+                  </Typography>
+                  <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
+                    Time: {schedule?.StartTime || 'N/A'} - {schedule?.EndTime || 'N/A'}
+                  </Typography>
+                  <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
+                    Dates: {schedule?.StartDate || 'N/A'} to {schedule?.EndDate || 'N/A'}
+                  </Typography>
+                  {schedule?.Days && (
+                    <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
+                      Days: {Array.isArray(schedule.Days) ? schedule.Days.join(', ') : schedule.Days}
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+        }
+        arrow
+        placement="bottom"
+      >
+        <Chip
+          label={`${schedules.length} Schedule${schedules.length > 1 ? 's' : ''}`}
+          size="small"
+          sx={{
+            bgcolor: '#e8f5e9',
+            color: '#2e7d32',
+            fontWeight: 500,
+            cursor: 'pointer',
+            '&:hover': {
+              bgcolor: '#c8e6c9'
+            }
+          }}
+        />
+      </Tooltip>
+    );
+  };
+
   const handleLimitChange = (event) => {
     setLimit(event.target.value);
   };
@@ -111,6 +248,11 @@ const MonitorListResults = (props) => {
                   Description
                 </TableCell>
 
+                {/* MOVED: Scheduled Playlists column - placed between Description and Default Playlist */}
+                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '15%' }}>
+                  Scheduled Playlists
+                </TableCell>
+
                 <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '20%' }}>
                   Default Playlist
                 </TableCell>
@@ -127,7 +269,7 @@ const MonitorListResults = (props) => {
                 if (!filtered || filtered.length === 0) {
                   return (
                     <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                      <TableCell colSpan={6} align="center" sx={{ py: 6, color: 'text.secondary' }}>
                         No matches found
                       </TableCell>
                     </TableRow>
@@ -171,10 +313,15 @@ const MonitorListResults = (props) => {
                         </Typography>
                       </TableCell>
 
+                      {/* Scheduled Playlists cell (moved) */}
+                      <TableCell align="left" sx={{ padding: '16px', width: '15%' }}>
+                        {renderScheduledPlaylists(monitor)}
+                      </TableCell>
+
                       <TableCell align="left" onClick={() => props.view && props.view(monitor)} sx={{ padding: '16px', cursor: 'pointer', color: '#666', fontSize: '0.9rem', width: '20%', '&:hover': { backgroundColor: '#fafafa' } }}>
                         {monitor.DefaultPlaylistName}
                       </TableCell>
-
+                      
                       <TableCell align="center" sx={{ padding: '16px', width: '10%' }}>
                         <Button
                           sx={{

@@ -166,6 +166,7 @@ const SaveMonitorDetails = (props) => {
   //   // saveMonitorData();
   // };
 
+  // In the saveMonitorData function, after successful save, refetch the monitor data:
   function saveMonitorData() {
     // derive currently selected schedules from the selectedScheduleObjects (keeps chips + select in sync)
     const selectedSchedules = (selectedScheduleObjects || [])
@@ -194,12 +195,29 @@ const SaveMonitorDetails = (props) => {
 
     props.saveMonitor(saveMonitorDetails, (err) => {
       if (err.exists) {
-        window.scrollTo(0, 0);
         setcolor('error');
-        setboxMessage(err.err);
+        setboxMessage(err.err || 'Failed to save monitor');
         setbox(true);
+        setTimeout(() => {
+          setbox(false);
+        }, 3000);
       } else {
-        navigate('/app/monitors', { replace: true });
+        setcolor('success');
+        setboxMessage(`Monitor ${type}d Successfully!`);
+        setbox(true);
+        
+        // Optimistic local update: reflect saved schedules immediately with no extra network waits
+        // selectedSchedules was derived above and contains active ScheduleRef values
+        const activeRefs = selectedSchedules.map((s) => s.ScheduleRef);
+        setSelectedScheduleRefs(activeRefs);
+        // clear deleted markers after successful save
+        setDeletedSchedules([]);
+
+        // keep a short success toast, then redirect
+        setTimeout(() => {
+          setbox(false);
+          navigate('/app/monitors', { replace: true, state: { refresh: true } });
+        }, 1500);
       }
     });
   }
@@ -392,6 +410,22 @@ const SaveMonitorDetails = (props) => {
         >
           <Alert onClose={handleCloseSnackBar} severity="error">
             {clashingSchedulesError} Schedules Are Clashing
+          </Alert>
+        </Snackbar>
+
+        {/* ✅ Success / Error toast for Save action */}
+        <Snackbar
+          open={box}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+          autoHideDuration={1800}
+          onClose={() => setbox(false)}
+        >
+          <Alert
+            onClose={() => setbox(false)}
+            severity={color === 'error' ? 'error' : 'success'}
+            sx={{ width: '100%' }}
+          >
+            {boxMessage}
           </Alert>
         </Snackbar>
 

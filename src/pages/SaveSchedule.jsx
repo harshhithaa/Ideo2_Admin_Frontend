@@ -30,6 +30,28 @@ import {
   Alert
 } from '@mui/material';
 
+// Map day names to numeric codes that the database expects
+const DAY_NAME_TO_CODE = {
+  monday: '1',
+  tuesday: '2',
+  wednesday: '3',
+  thursday: '4',
+  friday: '5',
+  saturday: '6',
+  sunday: '7'
+};
+
+// Reverse mapping for loading existing schedules (canonical — use '7' for Sunday)
+const DAY_CODE_TO_NAME = {
+  '7': 'sunday',
+  '1': 'monday',
+  '2': 'tuesday',
+  '3': 'wednesday',
+  '4': 'thursday',
+  '5': 'friday',
+  '6': 'saturday'
+};
+
 const SaveScheduleDetails = (props) => {
   const navigate = useNavigate();
   const { state } = useLocation();
@@ -57,14 +79,11 @@ const SaveScheduleDetails = (props) => {
   const [popupMessage, setPopupMessage] = useState('');
   const [popupSeverity, setPopupSeverity] = useState('success');
 
-  // Add refs for time inputs
   const startTimeRef = React.useRef(null);
   const endTimeRef = React.useRef(null);
-
-  // Add state for time validation error
   const [timeError, setTimeError] = useState('');
+  const [dateError, setDateError] = useState(''); // added
 
-  // Days state (individual days)
   const [days, setDays] = useState({
     sunday: false,
     monday: false,
@@ -75,7 +94,6 @@ const SaveScheduleDetails = (props) => {
     saturday: false
   });
 
-  // Days mode: 'all' -> All Days, 'custom' -> Custom Days
   const [daysMode, setDaysMode] = useState('all');
 
   // Load existing days if editing and determine mode
@@ -90,19 +108,27 @@ const SaveScheduleDetails = (props) => {
         friday: false,
         saturday: false
       };
+      
       state.Days.forEach((day) => {
-        const dayLower = day.toLowerCase();
-        if (dayLower in newDays) {
-          newDays[dayLower] = true;
+        // normalize incoming codes/strings: coerce '0' to '7', accept names or codes
+        let incoming = String(day).toLowerCase();
+        if (incoming === '0') incoming = '7'; // normalize legacy 0 -> 7
+
+        let dayName = incoming;
+        if (DAY_CODE_TO_NAME[incoming]) {
+          dayName = DAY_CODE_TO_NAME[incoming];
+        }
+
+        if (dayName in newDays) {
+          newDays[dayName] = true;
         }
       });
+      
       setDays(newDays);
 
-      // Determine mode: if all 7 true -> all, else custom
       const allSelected = Object.values(newDays).every(Boolean);
       setDaysMode(allSelected ? 'all' : 'custom');
     } else {
-      // default to All Days
       setDaysMode('all');
       setDays({
         sunday: true,
@@ -130,13 +156,26 @@ const SaveScheduleDetails = (props) => {
     if (start && end) {
       const [startHour, startMin] = start.split(':').map(Number);
       const [endHour, endMin] = end.split(':').map(Number);
-      
+
       if (endHour < startHour || (endHour === startHour && endMin <= startMin)) {
         setTimeError('End time must be after start time');
         return false;
       }
     }
     setTimeError('');
+    return true;
+  };
+
+  // Validate End Date is same or after Start Date
+  const validateDate = (start, end) => {
+    if (start && end) {
+      // ISO date strings (YYYY-MM-DD) can be compared lexicographically safely
+      if (end < start) {
+        setDateError('End date must be the same or after start date');
+        return false;
+      }
+    }
+    setDateError('');
     return true;
   };
 
@@ -148,7 +187,6 @@ const SaveScheduleDetails = (props) => {
     setDays(next);
   };
 
-  // When daysMode changes to 'all', mark all days selected; when 'custom' clear all selections
   const handleDaysModeChange = (e) => {
     const mode = e.target.value;
     setDaysMode(mode);
@@ -164,7 +202,6 @@ const SaveScheduleDetails = (props) => {
         saturday: true
       });
     } else {
-      // NEW BEHAVIOR: when switching to 'custom' clear all selections so user must pick explicitly
       setDays({
         sunday: false,
         monday: false,
@@ -189,20 +226,30 @@ const SaveScheduleDetails = (props) => {
       endTime !== '' &&
       selectedPlaylist !== '' &&
       daysValid &&
-      !timeError
+      !timeError &&
+      !dateError // include date validation
     );
   };
 
   const handleSubmit = (e) => {
     e && e.preventDefault();
-    
+
+    // ensure date validation before submit
+    if (!validateDate(startDate, endDate)) {
+      return;
+    }
+
     if (!isFormValid()) {
       return;
     }
 
     setLoading(true);
 
-    const selectedDays = daysMode === 'all' ? daysKeys : Object.keys(days).filter((k) => days[k]);
+    // Get selected day names
+    const selectedDayNames = daysMode === 'all' ? daysKeys : Object.keys(days).filter((k) => days[k]);
+    
+    // Convert day names to numeric codes for the database
+    const selectedDayCodes = selectedDayNames.map(dayName => DAY_NAME_TO_CODE[dayName]);
 
     const payload = {
       scheduleRef: scheduleRef || null,
@@ -216,7 +263,7 @@ const SaveScheduleDetails = (props) => {
         EndTime: endTime || null,
         StartDate: startDate || null,
         EndDate: endDate || null,
-        Days: selectedDays
+        Days: selectedDayCodes  // Send numeric codes instead of day names
       }
     };
 
@@ -326,7 +373,18 @@ const SaveScheduleDetails = (props) => {
                   label="Start Date"
                   type="date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setStartDate(val);
+
+                    // If endDate is before new startDate, adjust endDate to startDate
+                    if (endDate && val && endDate < val) {
+                      setEndDate(val);
+                      validateDate(val, val);
+                    } else {
+                      validateDate(val, endDate);
+                    }
+                  }}
                   fullWidth
                   required
                   InputLabelProps={{ shrink: true, sx: labelSx }}
@@ -339,10 +397,17 @@ const SaveScheduleDetails = (props) => {
                   label="End Date"
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEndDate(val);
+                    validateDate(startDate, val);
+                  }}
                   fullWidth
                   required
+                  error={!!dateError}
+                  helperText={dateError}
                   InputLabelProps={{ shrink: true, sx: labelSx }}
+                  inputProps={{ min: startDate || undefined }} // disable dates before startDate
                   size="medium"
                 />
               </Grid>
