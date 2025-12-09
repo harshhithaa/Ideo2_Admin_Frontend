@@ -707,24 +707,26 @@ export const getMonitorStatus = (adminRef, callback) => (dispatch) => {
 export const getMonitorStatusRealtime = (monitorRef, callback) => (dispatch) => {
   const token = store.getState().root.user.accesstoken;
   try {
-    return Api.get(`/admin/monitor/${monitorRef}/status`, {
-      headers: {
-        AuthToken: token
-      },
-      timeout: 10000 // 10 second timeout
-    })
+    return Api.post('/admin/monitor/fetchmonitorstatus', 
+      { MonitorRef: monitorRef }, // ✅ This is correct
+      {
+        headers: {
+          AuthToken: token
+        },
+        timeout: 10000
+      }
+    )
       .then((res) => {
         if (!res.data.Error) {
           const statusData = res.data.Details;
           console.log('Monitor Status Realtime:', statusData);
           
           if (typeof callback === 'function') {
-            callback({ Error: false, Details: statusData });
+            callback({ exists: false, data: statusData }); // ✅ Changed to match your callback pattern
           }
           return statusData;
         }
 
-        // Error handling
         if (res.data.Error && res.data.Error.ErrorCode === ErrorCode.Invalid_User_Credentials) {
           dispatch({
             type: STOREUSER,
@@ -736,21 +738,21 @@ export const getMonitorStatusRealtime = (monitorRef, callback) => (dispatch) => 
         }
         
         if (typeof callback === 'function') {
-          callback({ Error: true, Message: res.data.Error?.ErrorMessage });
+          callback({ exists: true, errmessage: res.data.Error?.ErrorMessage }); // ✅ Changed to match pattern
         }
         return Promise.reject(res.data.Error);
       })
       .catch((err) => {
         console.error('getMonitorStatusRealtime error:', err);
         if (typeof callback === 'function') {
-          callback({ Error: true, Message: err.message || 'Failed to fetch status' });
+          callback({ exists: true, err: err.message || 'Failed to fetch status' }); // ✅ Fixed
         }
         throw err;
       });
   } catch (err) {
     console.error('getMonitorStatusRealtime exception:', err);
     if (typeof callback === 'function') {
-      callback({ Error: true, Message: err.message || 'Failed to fetch status' });
+      callback({ exists: true, err: err.message || 'Failed to fetch status' }); // ✅ Fixed
     }
     return Promise.reject(err);
   }

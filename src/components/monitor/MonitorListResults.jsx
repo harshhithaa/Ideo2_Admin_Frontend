@@ -73,25 +73,42 @@ const MonitorListResults = (props) => {
 
   // Fetch status for a single monitor
   const handleRefreshStatus = async (monitorRef) => {
+    console.log('🔵 handleRefreshStatus called for:', monitorRef);
     setLoadingStatus(prev => ({ ...prev, [monitorRef]: true }));
     
     try {
       await props.getMonitorStatusRealtime(monitorRef, (response) => {
-        if (!response.Error) {
+        console.log('🔵 Raw callback response:', response);
+        
+        // ✅ FIX: Handle the actual response structure {exists, data}
+        if (response && response.data && !response.Error) {
+          console.log('✅ Setting status for', monitorRef, 'with data:', response.data);
+          setMonitorStatuses(prev => {
+            const newState = {
+              ...prev,
+              [monitorRef]: response.data
+            };
+            console.log('✅ New monitorStatuses state:', newState);
+            return newState;
+          });
+        } else if (response && response.Details) {
+          // Fallback for standard API response format
+          console.log('✅ Setting status (Details format) for', monitorRef);
           setMonitorStatuses(prev => ({
             ...prev,
-            [monitorRef]: response.Details || { error: 'No response' }
+            [monitorRef]: response.Details
           }));
         } else {
+          console.log('⚠️ No data in response');
           setMonitorStatuses(prev => ({
             ...prev,
-            [monitorRef]: { error: response.Message || 'Failed to fetch status' }
+            [monitorRef]: { error: 'No data available' }
           }));
         }
         setLoadingStatus(prev => ({ ...prev, [monitorRef]: false }));
       });
     } catch (error) {
-      console.error('Error fetching status:', error);
+      console.error('❌ Exception caught:', error);
       setMonitorStatuses(prev => ({
         ...prev,
         [monitorRef]: { error: error.message || 'Failed to fetch status' }
@@ -170,27 +187,63 @@ const MonitorListResults = (props) => {
       );
     }
 
-    // Online status with details
+    // ✅ Check if Status field is 'online' or 'offline'
+    const isOnline = status.Status === 'online';
+    
+    if (!isOnline) {
+      return (
+        <Tooltip title={`Last seen: ${new Date(status.LastUpdate).toLocaleString()}`} arrow>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Chip 
+              label="Offline" 
+              size="small"
+              sx={{ 
+                bgcolor: '#ffebee',
+                color: '#c62828'
+              }}
+            />
+            <IconButton 
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRefreshStatus(monitor.MonitorRef);
+              }}
+              sx={{ padding: '4px' }}
+            >
+              <SvgIcon fontSize="small">
+                <RefreshIcon />
+              </SvgIcon>
+            </IconButton>
+          </Box>
+        </Tooltip>
+      );
+    }
+
+    // ✅ Online status - show playlist name in green
+    const playlistName = status.CurrentPlaylist || 'Active';
     const tooltipContent = (
       <Box sx={{ p: 0.5 }}>
         <Typography variant="caption" sx={{ display: 'block', fontWeight: 600 }}>
-          Current Playlist: {status.currentPlaylist || 'N/A'}
+          Current Playlist: {status.CurrentPlaylist || 'N/A'}
         </Typography>
         <Typography variant="caption" sx={{ display: 'block' }}>
-          Type: {status.playlistType || 'N/A'}
+          Type: {status.PlaylistType || 'N/A'}
         </Typography>
-        {status.currentMedia && (
+        {status.CurrentMedia && (
           <Typography variant="caption" sx={{ display: 'block' }}>
-            Media: {status.currentMedia}
+            Media: {status.CurrentMedia}
           </Typography>
         )}
-        {status.mediaIndex !== undefined && status.totalMedia !== undefined && (
+        {status.MediaIndex !== undefined && status.TotalMedia !== undefined && (
           <Typography variant="caption" sx={{ display: 'block' }}>
-            Progress: {status.mediaIndex + 1}/{status.totalMedia}
+            Progress: {status.MediaIndex + 1}/{status.TotalMedia}
           </Typography>
         )}
         <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem' }}>
-          Last Update: {new Date(status.timestamp).toLocaleString()}
+          Last Update: {new Date(status.LastUpdate).toLocaleString()}
+        </Typography>
+        <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
+          ({status.SecondsSinceUpdate}s ago)
         </Typography>
       </Box>
     );
@@ -199,12 +252,13 @@ const MonitorListResults = (props) => {
       <Tooltip title={tooltipContent} arrow placement="left">
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Chip 
-            label="Online" 
+            label={playlistName}
             size="small"
             sx={{ 
               bgcolor: '#e8f5e9',
               color: '#2e7d32',
-              fontWeight: 500
+              fontWeight: 600,
+              minWidth: '80px'
             }}
           />
           <IconButton 
