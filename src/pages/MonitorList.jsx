@@ -8,10 +8,9 @@ import { Helmet } from 'react-helmet-async';
 import { Box, Container, Button, Modal, Grid } from '@mui/material';
 import MonitorListResults from 'src/components/monitor/MonitorListResults';
 import MonitorListToolbar from 'src/components/monitor/MonitorListToolbar';
-// import monitors from '../__mocks__/monitors';
 import { connect } from 'react-redux';
 import { COMPONENTS } from 'src/utils/constant.jsx';
-import { getUserComponentList } from '../store/action/user';
+import { getUserComponentList, getMonitorStatusRealtime } from '../store/action/user';
 import { useNavigate } from 'react-router-dom';
 
 const MonitorList = (props) => {
@@ -27,12 +26,12 @@ const MonitorList = (props) => {
 
   useEffect(() => {
     const data = {
-  componenttype: COMPONENTS.Monitor
-};
+      componenttype: COMPONENTS.Monitor
+    };
 
     const dataForPlaylist = {
-  componenttype: COMPONENTS.Playlist
-};
+      componenttype: COMPONENTS.Playlist
+    };
 
     props.getUserComponentList(data, (err) => {
       if (err.exists) {
@@ -54,6 +53,7 @@ const MonitorList = (props) => {
       }
     });
   }, [loader]);
+
   const style = {
     position: 'absolute',
     top: '50%',
@@ -76,6 +76,7 @@ const MonitorList = (props) => {
       }
     });
   };
+
   return (
     <>
       <Helmet>
@@ -84,7 +85,7 @@ const MonitorList = (props) => {
       <Box
         sx={{
           backgroundColor: 'background.default',
-          height: '100%',                 // fill available layout height
+          height: '100%',
           display: 'flex',
           flexDirection: 'column',
           py: 3,
@@ -134,7 +135,6 @@ const MonitorList = (props) => {
             selectedMonitorList={selected}
           />
 
-          {/* results area — internal scroll only */}
           <Box sx={{ pt: 3, flex: '1 1 auto', minHeight: 0, overflow: 'auto' }}>
             <MonitorListResults
               setselected={setselected}
@@ -146,6 +146,7 @@ const MonitorList = (props) => {
               editcall={(e) =>
                 navigate('/app/savemonitor', { state: { ...e, type: 'Edit' } })
               }
+              getMonitorStatusRealtime={props.getMonitorStatusRealtime}
             />
           </Box>
         </Container>
@@ -153,6 +154,7 @@ const MonitorList = (props) => {
     </>
   );
 };
+
 const mapStateToProps = ({ root = {} }) => {
   const monitorlist = root.user.components;
 
@@ -160,9 +162,12 @@ const mapStateToProps = ({ root = {} }) => {
     monitorlist
   };
 };
+
 const mapDispatchToProps = (dispatch) => ({
   getUserComponentList: (data, callback) =>
-    dispatch(getUserComponentList(data, callback))
+    dispatch(getUserComponentList(data, callback)),
+  getMonitorStatusRealtime: (monitorRef, callback) =>
+    dispatch(getMonitorStatusRealtime(monitorRef, callback))
 });
 
 export default connect(mapStateToProps, mapDispatchToProps)(MonitorList);

@@ -71,7 +71,6 @@ const MonitorListToolbar = (props) => {
     });
   };
 
-  // helper to show selected playlist name
   const selectedPlaylistName = props.playlistList?.find((p) => p.PlaylistRef === selectedPlaylist)?.Name || '';
 
   return (
@@ -102,7 +101,6 @@ const MonitorListToolbar = (props) => {
             </Alert>
           </Snackbar>
 
-          {/* Toolbar: single-row, no white Card background; matched spacing & sizes */}
           <Box
             sx={{
               display: 'flex',
@@ -134,13 +132,6 @@ const MonitorListToolbar = (props) => {
             />
 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {/* Select All Button */}
-   
-
-              {/* <Typography fontSize={16} sx={{ display: { xs: 'none', sm: 'block' } }}>
-                Select Playlist:
-              </Typography> */}
-
               <Select
                 labelId="select-playlist"
                 id="select-playlist"
@@ -170,7 +161,6 @@ const MonitorListToolbar = (props) => {
                 }}
                 aria-label="Select default playlist"
               >
-                {/* placeholder option for keyboard / accessibility */}
                 <MenuItem value="">
                   <em>Select playlist</em>
                 </MenuItem>
@@ -181,7 +171,6 @@ const MonitorListToolbar = (props) => {
                 ))}
               </Select>
 
-              {/* Tooltip shown only when no monitors are selected */}
               {(!props.selectedMonitorList || props.selectedMonitorList.length === 0) ? (
                 <Tooltip title="Select monitors and a default playlist" arrow>
                   <span>
@@ -212,7 +201,6 @@ const MonitorListToolbar = (props) => {
             </Box>
           </Box>
 
-          {/* Modal remains unchanged */}
           <Modal
             open={showmodal}
             onClose={() => setModal(false)}

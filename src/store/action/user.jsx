@@ -703,3 +703,55 @@ export const getMonitorStatus = (adminRef, callback) => (dispatch) => {
     return Promise.reject(err);
   }
 };
+
+export const getMonitorStatusRealtime = (monitorRef, callback) => (dispatch) => {
+  const token = store.getState().root.user.accesstoken;
+  try {
+    return Api.get(`/admin/monitor/${monitorRef}/status`, {
+      headers: {
+        AuthToken: token
+      },
+      timeout: 10000 // 10 second timeout
+    })
+      .then((res) => {
+        if (!res.data.Error) {
+          const statusData = res.data.Details;
+          console.log('Monitor Status Realtime:', statusData);
+          
+          if (typeof callback === 'function') {
+            callback({ Error: false, Details: statusData });
+          }
+          return statusData;
+        }
+
+        // Error handling
+        if (res.data.Error && res.data.Error.ErrorCode === ErrorCode.Invalid_User_Credentials) {
+          dispatch({
+            type: STOREUSER,
+            payload: {
+              valid: false,
+              accesstoken: null
+            }
+          });
+        }
+        
+        if (typeof callback === 'function') {
+          callback({ Error: true, Message: res.data.Error?.ErrorMessage });
+        }
+        return Promise.reject(res.data.Error);
+      })
+      .catch((err) => {
+        console.error('getMonitorStatusRealtime error:', err);
+        if (typeof callback === 'function') {
+          callback({ Error: true, Message: err.message || 'Failed to fetch status' });
+        }
+        throw err;
+      });
+  } catch (err) {
+    console.error('getMonitorStatusRealtime exception:', err);
+    if (typeof callback === 'function') {
+      callback({ Error: true, Message: err.message || 'Failed to fetch status' });
+    }
+    return Promise.reject(err);
+  }
+};

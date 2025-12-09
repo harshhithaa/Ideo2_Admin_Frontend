@@ -2,7 +2,7 @@
 /* eslint-disable linebreak-style */
 import { useState } from 'react';
 import PerfectScrollbar from 'react-perfect-scrollbar';
-import { Edit as EditIcon } from 'react-feather';
+import { Edit as EditIcon, RefreshCw as RefreshIcon } from 'react-feather';
 import {
   Box,
   Button,
@@ -17,7 +17,9 @@ import {
   Typography,
   SvgIcon,
   Chip,
-  Tooltip
+  Tooltip,
+  CircularProgress,
+  IconButton
 } from '@mui/material';
 import PropTypes from 'prop-types';
 
@@ -27,8 +29,9 @@ const MonitorListResults = (props) => {
   const [limit, setLimit] = useState(10);
   const [page, setPage] = useState(0);
   const [allchecked, setall] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState({});
+  const [monitorStatuses, setMonitorStatuses] = useState({});
 
-  // make filtering behavior match PlaylistListResults (case-insensitive)
   const filtered = monitors
     ? monitors.filter((item) =>
         (item.MonitorName || item.Name || '').toString().toLowerCase().includes((search || '').toLowerCase())
@@ -68,9 +71,160 @@ const MonitorListResults = (props) => {
     setSelectedMonitorRefs(newSelectedMonitorRefs);
   };
 
-  // Render scheduled playlists cell (copied from reference, exact styling & tooltip)
+  // Fetch status for a single monitor
+  const handleRefreshStatus = async (monitorRef) => {
+    setLoadingStatus(prev => ({ ...prev, [monitorRef]: true }));
+    
+    try {
+      await props.getMonitorStatusRealtime(monitorRef, (response) => {
+        if (!response.Error) {
+          setMonitorStatuses(prev => ({
+            ...prev,
+            [monitorRef]: response.Details || { error: 'No response' }
+          }));
+        } else {
+          setMonitorStatuses(prev => ({
+            ...prev,
+            [monitorRef]: { error: response.Message || 'Failed to fetch status' }
+          }));
+        }
+        setLoadingStatus(prev => ({ ...prev, [monitorRef]: false }));
+      });
+    } catch (error) {
+      console.error('Error fetching status:', error);
+      setMonitorStatuses(prev => ({
+        ...prev,
+        [monitorRef]: { error: error.message || 'Failed to fetch status' }
+      }));
+      setLoadingStatus(prev => ({ ...prev, [monitorRef]: false }));
+    }
+  };
+
+  // Render status cell with current info
+  const renderStatusCell = (monitor) => {
+    const status = monitorStatuses[monitor.MonitorRef];
+    const isLoading = loadingStatus[monitor.MonitorRef];
+
+    if (isLoading) {
+      return (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CircularProgress size={20} />
+          <Typography variant="caption">Checking...</Typography>
+        </Box>
+      );
+    }
+
+    if (!status) {
+      return (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Chip 
+            label="Unknown" 
+            size="small"
+            sx={{ 
+              bgcolor: '#e0e0e0',
+              color: '#666'
+            }}
+          />
+          <IconButton 
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRefreshStatus(monitor.MonitorRef);
+            }}
+            sx={{ padding: '4px' }}
+          >
+            <SvgIcon fontSize="small">
+              <RefreshIcon />
+            </SvgIcon>
+          </IconButton>
+        </Box>
+      );
+    }
+
+    if (status.error) {
+      return (
+        <Tooltip title={status.error} arrow>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Chip 
+              label="Offline" 
+              size="small"
+              sx={{ 
+                bgcolor: '#ffebee',
+                color: '#c62828'
+              }}
+            />
+            <IconButton 
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRefreshStatus(monitor.MonitorRef);
+              }}
+              sx={{ padding: '4px' }}
+            >
+              <SvgIcon fontSize="small">
+                <RefreshIcon />
+              </SvgIcon>
+            </IconButton>
+          </Box>
+        </Tooltip>
+      );
+    }
+
+    // Online status with details
+    const tooltipContent = (
+      <Box sx={{ p: 0.5 }}>
+        <Typography variant="caption" sx={{ display: 'block', fontWeight: 600 }}>
+          Current Playlist: {status.currentPlaylist || 'N/A'}
+        </Typography>
+        <Typography variant="caption" sx={{ display: 'block' }}>
+          Type: {status.playlistType || 'N/A'}
+        </Typography>
+        {status.currentMedia && (
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            Media: {status.currentMedia}
+          </Typography>
+        )}
+        {status.mediaIndex !== undefined && status.totalMedia !== undefined && (
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            Progress: {status.mediaIndex + 1}/{status.totalMedia}
+          </Typography>
+        )}
+        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem' }}>
+          Last Update: {new Date(status.timestamp).toLocaleString()}
+        </Typography>
+      </Box>
+    );
+
+    return (
+      <Tooltip title={tooltipContent} arrow placement="left">
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Chip 
+            label="Online" 
+            size="small"
+            sx={{ 
+              bgcolor: '#e8f5e9',
+              color: '#2e7d32',
+              fontWeight: 500
+            }}
+          />
+          <IconButton 
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRefreshStatus(monitor.MonitorRef);
+            }}
+            sx={{ padding: '4px' }}
+          >
+            <SvgIcon fontSize="small">
+              <RefreshIcon />
+            </SvgIcon>
+          </IconButton>
+        </Box>
+      </Tooltip>
+    );
+  };
+
   const renderScheduledPlaylists = (monitor) => {
-    // Normalize schedules: accept null/undefined/empty/array; filter falsy entries
     let schedules = [];
     if (Array.isArray(monitor.Schedules)) {
       schedules = monitor.Schedules.filter(Boolean);
@@ -78,7 +232,6 @@ const MonitorListResults = (props) => {
       schedules = monitor.ScheduleList.filter(Boolean);
     }
 
-    // If no valid schedules -> explicit "No Schedules"
     if (!schedules || schedules.length === 0) {
       return (
         <Typography
@@ -94,12 +247,10 @@ const MonitorListResults = (props) => {
       );
     }
 
-    // helper to pick schedule name from multiple possible properties
     const getScheduleName = (s) => {
       return s?.Title || s?.ScheduleName || s?.Name || s?.title || 'Untitled Schedule';
     };
 
-    // Single schedule -> show chip + tooltip with name + details
     if (schedules.length === 1) {
       const schedule = schedules[0];
       const name = getScheduleName(schedule);
@@ -145,7 +296,6 @@ const MonitorListResults = (props) => {
       );
     }
 
-    // Multiple schedules -> show count chip with detailed tooltip including names
     return (
       <Tooltip
         title={
@@ -213,8 +363,6 @@ const MonitorListResults = (props) => {
 
   return (
     <Card sx={{ boxShadow: 2 }}>
-      {/* constrain the table area so the page doesn't scroll;
-          PerfectScrollbar will handle the inner scrolling area */}
       <PerfectScrollbar style={{ maxHeight: '60vh' }}>
         <Box sx={{ width: '100%', overflowY: 'auto', overflowX: 'hidden' }}>
           <Table stickyHeader sx={{ tableLayout: 'fixed', '& th, & td': { fontSize: '0.95rem' } }}>
@@ -240,24 +388,27 @@ const MonitorListResults = (props) => {
                   </Box>
                 </TableCell>
 
-                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '20%' }}>
+                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '15%' }}>
                   Monitor Name
                 </TableCell>
 
-                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '45%' }}>
+                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '30%' }}>
                   Description
                 </TableCell>
 
-                {/* MOVED: Scheduled Playlists column - placed between Description and Default Playlist */}
                 <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '15%' }}>
                   Scheduled Playlists
                 </TableCell>
 
-                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '20%' }}>
+                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '15%' }}>
                   Default Playlist
                 </TableCell>
 
-                <TableCell align="center" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '10%' }}>
+                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '12%' }}>
+                  Status
+                </TableCell>
+
+                <TableCell align="center" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '8%' }}>
                   Edit
                 </TableCell>
               </TableRow>
@@ -265,11 +416,10 @@ const MonitorListResults = (props) => {
 
             <TableBody>
               {(() => {
-                // show friendly "No matches found" inside the table when filter returns nothing
                 if (!filtered || filtered.length === 0) {
                   return (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                      <TableCell colSpan={7} align="center" sx={{ py: 6, color: 'text.secondary' }}>
                         No matches found
                       </TableCell>
                     </TableRow>
@@ -299,7 +449,7 @@ const MonitorListResults = (props) => {
                         </Box>
                       </TableCell>
 
-                      <TableCell align="left" onClick={() => props.view && props.view(monitor)} sx={{ padding: '16px', cursor: 'pointer', fontWeight: 500, color: '#1976d2', width: '20%', '&:hover': { textDecoration: 'underline' } }}>
+                      <TableCell align="left" onClick={() => props.view && props.view(monitor)} sx={{ padding: '16px', cursor: 'pointer', fontWeight: 500, color: '#1976d2', width: '15%', '&:hover': { textDecoration: 'underline' } }}>
                         <Box sx={{ alignItems: 'center', display: 'flex' }}>
                           <Typography color="textPrimary" variant="body2" noWrap sx={{ fontSize: '0.95rem' }}>
                             {monitor.MonitorName}
@@ -307,22 +457,25 @@ const MonitorListResults = (props) => {
                         </Box>
                       </TableCell>
 
-                      <TableCell align="left" onClick={() => props.view && props.view(monitor)} sx={{ padding: '16px', cursor: 'pointer', color: '#666', fontSize: '0.9rem', width: '45%', '&:hover': { backgroundColor: '#fafafa' } }}>
+                      <TableCell align="left" onClick={() => props.view && props.view(monitor)} sx={{ padding: '16px', cursor: 'pointer', color: '#666', fontSize: '0.9rem', width: '30%', '&:hover': { backgroundColor: '#fafafa' } }}>
                         <Typography noWrap sx={{ fontSize: '0.95rem', color: '#666' }}>
                           {monitor.Description === 'null' || !monitor.Description ? '--' : monitor.Description}
                         </Typography>
                       </TableCell>
 
-                      {/* Scheduled Playlists cell (moved) */}
                       <TableCell align="left" sx={{ padding: '16px', width: '15%' }}>
                         {renderScheduledPlaylists(monitor)}
                       </TableCell>
 
-                      <TableCell align="left" onClick={() => props.view && props.view(monitor)} sx={{ padding: '16px', cursor: 'pointer', color: '#666', fontSize: '0.9rem', width: '20%', '&:hover': { backgroundColor: '#fafafa' } }}>
+                      <TableCell align="left" onClick={() => props.view && props.view(monitor)} sx={{ padding: '16px', cursor: 'pointer', color: '#666', fontSize: '0.9rem', width: '15%', '&:hover': { backgroundColor: '#fafafa' } }}>
                         {monitor.DefaultPlaylistName}
                       </TableCell>
+
+                      <TableCell align="left" sx={{ padding: '16px', width: '12%' }}>
+                        {renderStatusCell(monitor)}
+                      </TableCell>
                       
-                      <TableCell align="center" sx={{ padding: '16px', width: '10%' }}>
+                      <TableCell align="center" sx={{ padding: '16px', width: '8%' }}>
                         <Button
                           sx={{
                             minWidth: 40,
@@ -365,7 +518,8 @@ const MonitorListResults = (props) => {
 };
 
 MonitorListResults.propTypes = {
-  monitors: PropTypes.array
+  monitors: PropTypes.array,
+  getMonitorStatusRealtime: PropTypes.func
 };
 
 export default MonitorListResults;
