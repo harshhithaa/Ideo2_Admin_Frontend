@@ -41,7 +41,7 @@ const DAY_NAME_TO_CODE = {
   sunday: '7'
 };
 
-// Reverse mapping for loading existing schedules (canonical — use '7' for Sunday)
+// Reverse mapping for loading existing schedules
 const DAY_CODE_TO_NAME = {
   '7': 'sunday',
   '1': 'monday',
@@ -82,7 +82,7 @@ const SaveScheduleDetails = (props) => {
   const startTimeRef = React.useRef(null);
   const endTimeRef = React.useRef(null);
   const [timeError, setTimeError] = useState('');
-  const [dateError, setDateError] = useState(''); // added
+  const [dateError, setDateError] = useState('');
 
   const [days, setDays] = useState({
     sunday: false,
@@ -110,9 +110,8 @@ const SaveScheduleDetails = (props) => {
       };
       
       state.Days.forEach((day) => {
-        // normalize incoming codes/strings: coerce '0' to '7', accept names or codes
         let incoming = String(day).toLowerCase();
-        if (incoming === '0') incoming = '7'; // normalize legacy 0 -> 7
+        if (incoming === '0') incoming = '7';
 
         let dayName = incoming;
         if (DAY_CODE_TO_NAME[incoming]) {
@@ -169,7 +168,6 @@ const SaveScheduleDetails = (props) => {
   // Validate End Date is same or after Start Date
   const validateDate = (start, end) => {
     if (start && end) {
-      // ISO date strings (YYYY-MM-DD) can be compared lexicographically safely
       if (end < start) {
         setDateError('End date must be the same or after start date');
         return false;
@@ -227,14 +225,132 @@ const SaveScheduleDetails = (props) => {
       selectedPlaylist !== '' &&
       daysValid &&
       !timeError &&
-      !dateError // include date validation
+      !dateError
     );
   };
+
+  // ==================== FIXED CONFLICT DETECTION ====================
+  
+  // Convert time string (HH:MM) to minutes since midnight
+  const timeToMinutes = (timeStr) => {
+    if (!timeStr) return 0;
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  // Normalize day codes/names to standard day codes ('1'-'7')
+  const normalizeDaysToCodes = (daysInput) => {
+    const result = new Set();
+    if (!daysInput) return result;
+
+    const arr = Array.isArray(daysInput) ? daysInput : String(daysInput).split(',').map(s => s.trim());
+    
+    arr.forEach((day) => {
+      if (!day) return;
+      
+      const dayStr = String(day).toLowerCase().trim();
+      
+      // If it's already a code
+      if (DAY_CODE_TO_NAME[dayStr]) {
+        result.add(dayStr);
+      }
+      // If it's a day name
+      else if (DAY_NAME_TO_CODE[dayStr]) {
+        result.add(DAY_NAME_TO_CODE[dayStr]);
+      }
+      // Handle '0' as Sunday ('7')
+      else if (dayStr === '0') {
+        result.add('7');
+      }
+    });
+    
+    return result;
+  };
+
+  // Check if two time ranges overlap
+  const timesOverlap = (start1, end1, start2, end2) => {
+    const s1 = timeToMinutes(start1);
+    const e1 = timeToMinutes(end1);
+    const s2 = timeToMinutes(start2);
+    const e2 = timeToMinutes(end2);
+    
+    // Times overlap if: start1 < end2 AND start2 < end1
+    return s1 < e2 && s2 < e1;
+  };
+
+  // Check if two date ranges overlap
+  const dateRangesOverlap = (start1, end1, start2, end2) => {
+    if (!start1 || !end1 || !start2 || !end2) return true; // If any date is missing, assume overlap
+    
+    // Convert to Date objects for comparison
+    const d1Start = new Date(start1);
+    const d1End = new Date(end1);
+    const d2Start = new Date(start2);
+    const d2End = new Date(end2);
+    
+    // Ranges overlap if: start1 <= end2 AND start2 <= end1
+    return d1Start <= d2End && d2Start <= d1End;
+  };
+
+  // Main conflict detection function
+  const findConflicts = (newSchedule, existingSchedules, editingRef) => {
+    const conflicts = [];
+    
+    const newDayCodes = normalizeDaysToCodes(newSchedule.Days);
+    
+    for (const existing of existingSchedules) {
+      // Skip if comparing with itself (when editing)
+      if (editingRef && existing.ScheduleRef === editingRef) {
+        continue;
+      }
+
+      // Skip inactive schedules
+      if (existing.IsActive === 0) {
+        continue;
+      }
+
+      // Get existing schedule's days
+      const existingDayCodes = normalizeDaysToCodes(existing.Days);
+      
+      // Check if they share ANY common day
+      const hasCommonDay = [...newDayCodes].some(day => existingDayCodes.has(day));
+      
+      if (!hasCommonDay) {
+        continue; // No common days = no conflict
+      }
+
+      // Check if date ranges overlap
+      if (!dateRangesOverlap(
+        newSchedule.StartDate,
+        newSchedule.EndDate,
+        existing.StartDate,
+        existing.EndDate
+      )) {
+        continue; // Date ranges don't overlap = no conflict
+      }
+
+      // Check if time ranges overlap
+      if (!timesOverlap(
+        newSchedule.StartTime,
+        newSchedule.EndTime,
+        existing.StartTime,
+        existing.EndTime
+      )) {
+        continue; // Time ranges don't overlap = no conflict
+      }
+
+      // If we reach here, there's a conflict
+      conflicts.push(existing);
+    }
+    
+    return conflicts;
+  };
+
+  // ==================== END CONFLICT DETECTION ====================
 
   const handleSubmit = (e) => {
     e && e.preventDefault();
 
-    // ensure date validation before submit
     if (!validateDate(startDate, endDate)) {
       return;
     }
@@ -243,13 +359,44 @@ const SaveScheduleDetails = (props) => {
       return;
     }
 
-    setLoading(true);
-
-    // Get selected day names
+    // Get selected day names and convert to codes
     const selectedDayNames = daysMode === 'all' ? daysKeys : Object.keys(days).filter((k) => days[k]);
-    
-    // Convert day names to numeric codes for the database
     const selectedDayCodes = selectedDayNames.map(dayName => DAY_NAME_TO_CODE[dayName]);
+
+    // Build new schedule object for conflict checking
+    const newSchedule = {
+      StartTime: startTime,
+      EndTime: endTime,
+      StartDate: startDate,
+      EndDate: endDate,
+      Days: selectedDayCodes
+    };
+
+    // Get existing schedules from Redux store
+    const existingSchedules = props.schedules || [];
+
+    // Check for conflicts
+    const conflicts = findConflicts(newSchedule, existingSchedules, scheduleRef);
+
+    if (conflicts.length > 0) {
+      // Build conflict message
+      const conflictDetails = conflicts.map(c => {
+        const conflictDays = normalizeDaysToCodes(c.Days);
+        const dayNames = [...conflictDays].map(code => DAY_CODE_TO_NAME[code] || code).join(', ');
+        return `"${c.Title || 'Untitled'}" (${dayNames}, ${c.StartTime}-${c.EndTime})`;
+      }).join('; ');
+
+      setPopupMessage(
+        `Schedule conflict detected! This schedule overlaps with: ${conflictDetails}. ` +
+        `Please change the days, time range, or date range to resolve the conflict.`
+      );
+      setPopupSeverity('error');
+      setShowPopup(true);
+      return; // BLOCK SAVE
+    }
+
+    // No conflicts - proceed with save
+    setLoading(true);
 
     const payload = {
       scheduleRef: scheduleRef || null,
@@ -263,22 +410,19 @@ const SaveScheduleDetails = (props) => {
         EndTime: endTime || null,
         StartDate: startDate || null,
         EndDate: endDate || null,
-        Days: selectedDayCodes  // Send numeric codes instead of day names
+        Days: selectedDayCodes
       }
     };
 
     props.saveSchedule(payload, (response) => {
       setLoading(false);
       
-      // If response.exists is true, it's an error. Otherwise, it's success.
       if (response && response.exists === true) {
-        // Error case
         const errorMsg = response.message || response.err || 'Failed to save schedule. Please try again.';
         setPopupMessage(errorMsg);
         setPopupSeverity('error');
         setShowPopup(true);
       } else {
-        // Success case
         const message = scheduleRef 
           ? 'Schedule updated successfully!' 
           : 'Schedule saved successfully!';
@@ -377,7 +521,6 @@ const SaveScheduleDetails = (props) => {
                     const val = e.target.value;
                     setStartDate(val);
 
-                    // If endDate is before new startDate, adjust endDate to startDate
                     if (endDate && val && endDate < val) {
                       setEndDate(val);
                       validateDate(val, val);
@@ -407,7 +550,7 @@ const SaveScheduleDetails = (props) => {
                   error={!!dateError}
                   helperText={dateError}
                   InputLabelProps={{ shrink: true, sx: labelSx }}
-                  inputProps={{ min: startDate || undefined }} // disable dates before startDate
+                  inputProps={{ min: startDate || undefined }}
                   size="medium"
                 />
               </Grid>
@@ -421,7 +564,6 @@ const SaveScheduleDetails = (props) => {
                   onChange={(e) => {
                     setStartTime(e.target.value);
                     validateTime(e.target.value, endTime);
-                    // Auto-close when both hour and minute are set
                     if (e.target.value && e.target.value.includes(':')) {
                       setTimeout(() => {
                         if (startTimeRef.current) {
@@ -446,7 +588,6 @@ const SaveScheduleDetails = (props) => {
                   onChange={(e) => {
                     setEndTime(e.target.value);
                     validateTime(startTime, e.target.value);
-                    // Auto-close when both hour and minute are set
                     if (e.target.value && e.target.value.includes(':')) {
                       setTimeout(() => {
                         if (endTimeRef.current) {
@@ -569,7 +710,6 @@ const SaveScheduleDetails = (props) => {
                     </ToggleButtonGroup>
                   </Box>
 
-                  {/* validation helper when custom mode and no day selected */}
                   {selectedDaysArray.length === 0 && (
                     <Typography align="center" sx={{ color: 'error.main', mt: 1, fontSize: 13 }}>
                       Please select at least one day.
@@ -611,7 +751,9 @@ const SaveScheduleDetails = (props) => {
 
 const mapStateToProps = ({ root = {} }) => ({
   playlists:
-    (root.user && root.user.components && root.user.components.playlistList) || []
+    (root.user && root.user.components && root.user.components.playlistList) || [],
+  schedules:
+    (root.user && root.user.components && root.user.components.scheduleList) || []
 });
 
 const mapDispatchToProps = (dispatch) => ({

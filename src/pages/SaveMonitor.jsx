@@ -59,15 +59,12 @@ const SaveMonitorDetails = (props) => {
     (state && state.PlaylistRef) || ''
   );
   const [selectedSchedule, setSelectedSchedule] = useState([]);
-  // --- Rework schedule selection: use refs in Select value to allow proper toggle/unselect ---
   const [selectedScheduleRefs, setSelectedScheduleRefs] = useState(() => {
     const prevList = (state && state.Schedules) || [];
-    // keep only active items with a valid ScheduleRef
     return prevList
       .filter((item) => item && item.IsActive === 1 && Boolean(item.ScheduleRef))
       .map((s) => s.ScheduleRef);
   });
-  // keep original object array only as derived data for rendering and checks
   const selectedScheduleObjects = useMemo(() => {
     const allSchedules = scheduleData || [];
     const fromState = (state && state.Schedules) || [];
@@ -82,11 +79,10 @@ const SaveMonitorDetails = (props) => {
   const [loader, setloader] = useState(true);
   const [scheduleloader, setScheduleloader] = useState(true);
   const [orientation, setOrientation] = useState(() => {
-    // only derive a default when the location state actually contains Orientation
     if (state && typeof state.Orientation !== 'undefined' && state.Orientation !== null) {
       return state.Orientation === '90' ? 'Landscape' : 'Portrait';
     }
-    return ''; // no default so user can choose
+    return '';
   });
   const [type, settype] = useState(
     state && state.type === 'View'
@@ -96,31 +92,18 @@ const SaveMonitorDetails = (props) => {
       : 'Create'
   );
 
-  // Add isViewMode check
   const isViewMode = type === 'View';
 
   let [box, setbox] = useState(false);
   let [boxMessage, setboxMessage] = useState('');
   let [color, setcolor] = useState('success');
   const [checked, setChecked] = useState(false);
-  // const [disable, setDisable] = useState([]);
   let days = (state && state.Days && state.Days.split(',')) || [];
   const orientations = ['Portrait', 'Landscape'];
-  const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [clashingSchedulesError, setClashingSchedulesError] = useState('');
 
-  // only apply auto-close behavior for Edit monitors page
   const isEdit = state && state.type === 'Edit';
   const [scheduleOpen, setScheduleOpen] = useState(false);
-  
-  var clashingSchedules = [];
 
-  // slide interval removed per request
-  // const min = 5;
-  // const max = 60;
-  // const step = 5;
-
-  // consistent control width for all form inputs
   const controlWidth = { xs: '100%', sm: '720px' };
   
   useEffect(() => {
@@ -133,10 +116,9 @@ const SaveMonitorDetails = (props) => {
       setScheduleData(comp.scheduleList);
       setSchedule(comp.scheduleList);
     }
-  }, [props.component]); // ✅ Add dependency to sync with Redux state
+  }, [props.component]);
 
   useEffect(() => {
-    // ✅ Only fetch if data is not already loaded
     if (playlistData.length === 0) {
       const data = {
         componenttype: COMPONENTS.Playlist
@@ -158,39 +140,28 @@ const SaveMonitorDetails = (props) => {
         }
       });
     }
-  }, []); // ✅ Keep empty to run only once on mount
+  }, []);
 
-  // const saveData = () => {
-  //   console.log(selectedSchedule);
-  //   console.log(deletedSchedules);
-  //   // saveMonitorData();
-  // };
-
-  // In the saveMonitorData function, after successful save, refetch the monitor data:
   function saveMonitorData() {
-    // derive currently selected schedules from the selectedScheduleObjects (keeps chips + select in sync)
     const selectedSchedules = (selectedScheduleObjects || [])
-      .filter((item) => item && item.ScheduleRef) // DROP invalid/null refs
+      .filter((item) => item && item.ScheduleRef)
       .map((item) => ({
         ScheduleRef: item.ScheduleRef,
         IsActive: 1
       }));
 
-    // filter deletedSchedules to only include valid refs (defensive)
     const validDeleted = (deletedSchedules || []).filter((d) => d && d.ScheduleRef);
 
     const saveMonitorDetails = {
       MonitorName: title,
       Description: description,
       DefaultPlaylistRef: selectedPlaylist,
-      // include active selections and any deleted markers (only valid refs)
       Schedules: [...selectedSchedules, ...validDeleted],
       IsActive: 1,
       Orientation: orientation === 'Landscape' ? '90' : '0'
     };
     if (MonitorRef !== '') saveMonitorDetails.MonitorRef = MonitorRef;
 
-    // debug payload to help trace bad requests during testing
     console.log('saveMonitorDetails payload:', JSON.stringify(saveMonitorDetails));
 
     props.saveMonitor(saveMonitorDetails, (err) => {
@@ -206,14 +177,10 @@ const SaveMonitorDetails = (props) => {
         setboxMessage(`Monitor ${type}d Successfully!`);
         setbox(true);
         
-        // Optimistic local update: reflect saved schedules immediately with no extra network waits
-        // selectedSchedules was derived above and contains active ScheduleRef values
         const activeRefs = selectedSchedules.map((s) => s.ScheduleRef);
         setSelectedScheduleRefs(activeRefs);
-        // clear deleted markers after successful save
         setDeletedSchedules([]);
 
-        // keep a short success toast, then redirect
         setTimeout(() => {
           setbox(false);
           navigate('/app/monitors', { replace: true, state: { refresh: true } });
@@ -223,9 +190,7 @@ const SaveMonitorDetails = (props) => {
   }
 
   const handleChange = (e) => {
-    // e.target.value is an array of ScheduleRef (strings) now - filter falsy entries
     const newRefs = Array.isArray(e.target.value) ? e.target.value.filter(Boolean) : [];
-    // compute deleted: items that were previously selected but now not present
     const removed = selectedScheduleRefs.filter((r) => !newRefs.includes(r));
     if (removed.length > 0) {
       const addedDeleted = removed
@@ -248,143 +213,8 @@ const SaveMonitorDetails = (props) => {
   };
 
   const handleDateAndTime = () => {
-    // reuse helper logic but operate on selectedScheduleObjects
-    const parseISODate = (d) => {
-      if (!d) return null;
-      if (d.includes('-')) {
-        const parts = d.split('-').map((p) => p.trim());
-        if (parts[0].length === 4) {
-          return new Date(`${parts[0]}-${parts[1]}-${parts[2]}T00:00:00`);
-        }
-        return new Date(`${parts[2]}-${parts[1]}-${parts[0]}T00:00:00`);
-      }
-      const dd = new Date(d);
-      return isNaN(dd.getTime()) ? null : dd;
-    };
-
-    const timeToMinutes = (t) => {
-      if (!t) return null;
-      const [hh, mm] = String(t).split(':').map(Number);
-      if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
-      return hh * 60 + mm;
-    };
-
-    const normalizeDaysToIndices = (daysInput) => {
-      if (!daysInput) return new Set();
-      let arr = [];
-      if (Array.isArray(daysInput)) arr = daysInput;
-      else if (typeof daysInput === 'string') {
-        arr = daysInput.split(',').map((s) => s.trim());
-      } else {
-        return new Set();
-      }
-      const map = {
-        sunday: 0, sun: 0,
-        monday: 1, mon: 1,
-        tuesday: 2, tue: 2, tues: 2,
-        wednesday: 3, wed: 3,
-        thursday: 4, thu: 4, thur: 4, thurs: 4,
-        friday: 5, fri: 5,
-        saturday: 6, sat: 6
-      };
-      const out = new Set();
-      arr.forEach((d) => {
-        if (d === null || typeof d === 'undefined') return;
-        const s = String(d).toLowerCase().trim();
-        if (s === '') return;
-        if (map.hasOwnProperty(s)) out.add(map[s]);
-        else {
-          const n = parseInt(s, 10);
-          if (!Number.isNaN(n) && n >= 0 && n <= 6) out.add(n);
-        }
-      });
-      return out;
-    };
-
-    const dateRangesOverlap = (aStart, aEnd, bStart, bEnd) => {
-      return aStart <= bEnd && bStart <= aEnd;
-    };
-
-    const rangeHasWeekday = (startDate, endDate, weekday) => {
-      const startDow = startDate.getDay();
-      const diff = (weekday - startDow + 7) % 7;
-      const candidate = new Date(startDate);
-      candidate.setDate(startDate.getDate() + diff);
-      candidate.setHours(0, 0, 0, 0);
-      return candidate <= endDate;
-    };
-
-    const schedules = selectedScheduleObjects || [];
-    let isClashing = false;
-    clashingSchedules = [];
-
-    for (let i = 0; i < schedules.length; i++) {
-      const A = schedules[i];
-      const A_startDate = parseISODate(A.StartDate);
-      const A_endDate = parseISODate(A.EndDate);
-      const A_startMinutes = timeToMinutes(A.StartTime);
-      const A_endMinutes = timeToMinutes(A.EndTime);
-      const A_days = normalizeDaysToIndices(A.Days || A.DaysOfWeek || A.Days || A.Days);
-
-      if (!A_startDate || !A_endDate || A_startMinutes === null || A_endMinutes === null) continue;
-
-      for (let j = i + 1; j < schedules.length; j++) {
-        const B = schedules[j];
-        const B_startDate = parseISODate(B.StartDate);
-        const B_endDate = parseISODate(B.EndDate);
-        const B_startMinutes = timeToMinutes(B.StartTime);
-        const B_endMinutes = timeToMinutes(B.EndTime);
-        const B_days = normalizeDaysToIndices(B.Days || B.DaysOfWeek || B.Days || B.Days);
-
-        if (!B_startDate || !B_endDate || B_startMinutes === null || B_endMinutes === null) continue;
-
-        if (!dateRangesOverlap(A_startDate, A_endDate, B_startDate, B_endDate)) {
-          continue;
-        }
-
-        const commonDays = [...A_days].filter((d) => B_days.has(d));
-        if (commonDays.length === 0) {
-          continue;
-        }
-
-        const timesOverlap = (A_startMinutes < B_endMinutes) && (B_startMinutes < A_endMinutes);
-        if (!timesOverlap) {
-          continue;
-        }
-
-        const interStart = A_startDate > B_startDate ? A_startDate : B_startDate;
-        const interEnd = A_endDate < B_endDate ? A_endDate : B_endDate;
-        let weekdayFound = false;
-        for (const wd of commonDays) {
-          if (rangeHasWeekday(interStart, interEnd, wd)) {
-            weekdayFound = true;
-            break;
-          }
-        }
-        if (weekdayFound && timesOverlap) {
-          isClashing = true;
-          const aTitle = A.Title || `Schedule ${i + 1}`;
-          const bTitle = B.Title || `Schedule ${j + 1}`;
-          if (!clashingSchedules.includes(aTitle)) clashingSchedules.push(aTitle);
-          if (!clashingSchedules.includes(bTitle)) clashingSchedules.push(bTitle);
-        }
-      }
-    }
-
-    if (isClashing) {
-      setClashingSchedulesError(clashingSchedules.join(' '));
-      setOpenSnackbar(true);
-    } else {
-      saveMonitorData();
-    }
-  };
-
-  const handleCloseSnackBar = (event, reason) => {
-    if (reason === 'clickaway') {
-      return;
-    }
-    clashingSchedules = [];
-    setOpenSnackbar(false);
+    // NO CONFLICT CHECKING - Save directly
+    saveMonitorData();
   };
 
   return (
@@ -402,18 +232,6 @@ const SaveMonitorDetails = (props) => {
           justifyContent: 'center'
         }}
       >
-        <Snackbar
-          open={openSnackbar}
-          key={'top'}
-          autoHideDuration={5000}
-          onClose={handleCloseSnackBar}
-        >
-          <Alert onClose={handleCloseSnackBar} severity="error">
-            {clashingSchedulesError} Schedules Are Clashing
-          </Alert>
-        </Snackbar>
-
-        {/* ✅ Success / Error toast for Save action */}
         <Snackbar
           open={box}
           anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
@@ -475,7 +293,6 @@ const SaveMonitorDetails = (props) => {
                   </Box>
 
                   <Box sx={{ display: 'grid', gap: 2, justifyItems: 'center' }}>
-                    {/* Title field - disabled in view mode */}
                     <Box sx={{ width: controlWidth }}>
                       <TextField
                         error={Boolean(touched.title && errors.title)}
@@ -494,7 +311,6 @@ const SaveMonitorDetails = (props) => {
                       />
                     </Box>
 
-                    {/* Description field - disabled in view mode */}
                     <Box sx={{ width: controlWidth }}>
                       <TextField
                         error={Boolean(touched.description && errors.description)}
@@ -513,7 +329,6 @@ const SaveMonitorDetails = (props) => {
                       />
                     </Box>
 
-                    {/* Default Playlist - read-only box in view mode */}
                     <Box sx={{ width: controlWidth }}>
                       <InputLabel id="select-playlist" sx={{ fontWeight: 600, mb: 1, display: 'block' }}>
                         Default Playlist
@@ -566,7 +381,6 @@ const SaveMonitorDetails = (props) => {
                       )}
                     </Box>
 
-                    {/* Orientation - read-only box in view mode */}
                     <Box sx={{ width: controlWidth }}>
                       <InputLabel id="select-orientation" sx={{ fontWeight: 600, mb: 1 }}>
                         Select Orientation
@@ -611,7 +425,6 @@ const SaveMonitorDetails = (props) => {
                       )}
                     </Box>
 
-                    {/* Schedule - read-only chips in view mode */}
                     <Box sx={{ width: controlWidth }}>
                       <InputLabel id="select-schedule" sx={{ fontWeight: 600, mb: 1 }}>
                         Schedule
@@ -796,7 +609,6 @@ const SaveMonitorDetails = (props) => {
                       )}
                     </Box>
 
-                    {/* Action button - change based on mode */}
                     <Box sx={{ py: 2 }}>
                       {isViewMode ? (
                         <Button
