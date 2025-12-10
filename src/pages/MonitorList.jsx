@@ -140,6 +140,7 @@ const MonitorList = (props) => {
               setselected={setselected}
               search={search}
               monitors={monitors}
+              playlists={playlists}
               view={(e) =>
                 navigate('/app/savemonitor', { state: { ...e, type: 'View' } })
               }

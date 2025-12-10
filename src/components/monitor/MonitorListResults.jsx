@@ -24,7 +24,7 @@ import {
 import PropTypes from 'prop-types';
 
 const MonitorListResults = (props) => {
-  const { monitors, search } = props || {};
+  const { monitors, search, playlists } = props || {};
   const [selectedMonitorRefs, setSelectedMonitorRefs] = useState([]);
   const [limit, setLimit] = useState(10);
   const [page, setPage] = useState(0);
@@ -187,9 +187,63 @@ const MonitorListResults = (props) => {
       );
     }
 
-    // ✅ Check if Status field is 'online' or 'offline'
+    // Determine display name for the playlist:
+    // - use status.CurrentPlaylist if it's present and NOT the generic "Default"
+    // - otherwise fall back to monitor.DefaultPlaylistName (the value shown in the Default Playlist column)
+    // - final fallback to 'Active' or the raw status.CurrentPlaylist
+    const playlistName = (() => {
+      // 1) If status reports a specific playlist (not the generic "Default"), use it.
+      if (status && status.CurrentPlaylist && String(status.CurrentPlaylist).toLowerCase() !== 'default') {
+        return status.CurrentPlaylist;
+      }
+
+      // 2) If CurrentMedia is present, try to find the playlist that contains that media.
+      if (status && status.CurrentMedia) {
+        const pl = findPlaylistContainingMedia(status.CurrentMedia);
+        if (pl) {
+          return pl.Name || pl.PlaylistName || pl.Title || pl.DefaultPlaylistName || 'Playlist';
+        }
+      }
+
+      // 3) Fallback to monitor's DefaultPlaylistName (what's shown in the Default Playlist column).
+      if (monitor && monitor.DefaultPlaylistName) {
+        return monitor.DefaultPlaylistName;
+      }
+
+      // 4) Final fallbacks
+      return status.CurrentPlaylist || 'Active';
+    })();
+
+    const tooltipContent = (
+      <Box sx={{ p: 0.5 }}>
+        <Typography variant="caption" sx={{ display: 'block', fontWeight: 600 }}>
+          Current Playlist: {playlistName || 'N/A'}
+        </Typography>
+        <Typography variant="caption" sx={{ display: 'block' }}>
+          Type: {status.PlaylistType || 'N/A'}
+        </Typography>
+        {status.CurrentMedia && (
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            Media: {status.CurrentMedia}
+          </Typography>
+        )}
+        {status.MediaIndex !== undefined && status.TotalMedia !== undefined && (
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            Progress: {status.MediaIndex + 1}/{status.TotalMedia}
+          </Typography>
+        )}
+        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem' }}>
+          Last Update: {new Date(status.LastUpdate).toLocaleString()}
+        </Typography>
+        <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
+          ({status.SecondsSinceUpdate}s ago)
+        </Typography>
+      </Box>
+    );
+
+    // Check online/offline
     const isOnline = status.Status === 'online';
-    
+
     if (!isOnline) {
       return (
         <Tooltip title={`Last seen: ${new Date(status.LastUpdate).toLocaleString()}`} arrow>
@@ -219,35 +273,7 @@ const MonitorListResults = (props) => {
       );
     }
 
-    // ✅ Online status - show playlist name in green
-    const playlistName = status.CurrentPlaylist || 'Active';
-    const tooltipContent = (
-      <Box sx={{ p: 0.5 }}>
-        <Typography variant="caption" sx={{ display: 'block', fontWeight: 600 }}>
-          Current Playlist: {status.CurrentPlaylist || 'N/A'}
-        </Typography>
-        <Typography variant="caption" sx={{ display: 'block' }}>
-          Type: {status.PlaylistType || 'N/A'}
-        </Typography>
-        {status.CurrentMedia && (
-          <Typography variant="caption" sx={{ display: 'block' }}>
-            Media: {status.CurrentMedia}
-          </Typography>
-        )}
-        {status.MediaIndex !== undefined && status.TotalMedia !== undefined && (
-          <Typography variant="caption" sx={{ display: 'block' }}>
-            Progress: {status.MediaIndex + 1}/{status.TotalMedia}
-          </Typography>
-        )}
-        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem' }}>
-          Last Update: {new Date(status.LastUpdate).toLocaleString()}
-        </Typography>
-        <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
-          ({status.SecondsSinceUpdate}s ago)
-        </Typography>
-      </Box>
-    );
-
+    // Online status - show playlist name in green
     return (
       <Tooltip title={tooltipContent} arrow placement="left">
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -415,6 +441,55 @@ const MonitorListResults = (props) => {
     setPage(newPage);
   };
 
+  // Try to locate a playlist that contains the given media filename.
+  const findPlaylistContainingMedia = (mediaName) => {
+    if (!mediaName || !Array.isArray(playlists)) return null;
+    const target = String(mediaName).toLowerCase();
+
+    for (const pl of playlists) {
+      // Common possible media arrays used in different API shapes
+      const candidateArrays = [
+        pl.MediaList,
+        pl.Media,
+        pl.Medias,
+        pl.Items,
+        pl.files,
+        pl.list
+      ];
+
+      for (const arr of candidateArrays) {
+        if (!Array.isArray(arr)) continue;
+        for (const item of arr) {
+          if (!item) continue;
+          // possible filename fields
+          const names = [
+            item.Name,
+            item.FileName,
+            item.File,
+            item.MediaName,
+            item.Filename,
+            item.Source,
+            item.Url,
+            item.Path
+          ].filter(Boolean);
+
+          if (names.some(n => String(n).toLowerCase() === target || String(n).toLowerCase().endsWith(target))) {
+            return pl;
+          }
+        }
+      }
+
+      // Some playlist objects may carry a flat list of file names
+      if (Array.isArray(pl.Files)) {
+        if (pl.Files.some(f => String(f).toLowerCase() === target || String(f).toLowerCase().endsWith(target))) {
+          return pl;
+        }
+      }
+    }
+
+    return null;
+  };
+
   return (
     <Card sx={{ boxShadow: 2 }}>
       <PerfectScrollbar style={{ maxHeight: '60vh' }}>
@@ -573,7 +648,8 @@ const MonitorListResults = (props) => {
 
 MonitorListResults.propTypes = {
   monitors: PropTypes.array,
-  getMonitorStatusRealtime: PropTypes.func
+  getMonitorStatusRealtime: PropTypes.func,
+  playlists: PropTypes.array
 };
 
 export default MonitorListResults;
