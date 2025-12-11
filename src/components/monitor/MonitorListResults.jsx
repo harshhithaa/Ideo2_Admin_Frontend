@@ -187,61 +187,7 @@ const MonitorListResults = (props) => {
       );
     }
 
-    // Determine display name for the playlist:
-    // - use status.CurrentPlaylist if it's present and NOT the generic "Default"
-    // - otherwise fall back to monitor.DefaultPlaylistName (the value shown in the Default Playlist column)
-    // - final fallback to 'Active' or the raw status.CurrentPlaylist
-    const playlistName = (() => {
-      // 1) If status reports a specific playlist (not the generic "Default"), use it.
-      if (status && status.CurrentPlaylist && String(status.CurrentPlaylist).toLowerCase() !== 'default') {
-        return status.CurrentPlaylist;
-      }
-
-      // 2) If CurrentMedia is present, try to find the playlist that contains that media.
-      if (status && status.CurrentMedia) {
-        const pl = findPlaylistContainingMedia(status.CurrentMedia);
-        if (pl) {
-          return pl.Name || pl.PlaylistName || pl.Title || pl.DefaultPlaylistName || 'Playlist';
-        }
-      }
-
-      // 3) Fallback to monitor's DefaultPlaylistName (what's shown in the Default Playlist column).
-      if (monitor && monitor.DefaultPlaylistName) {
-        return monitor.DefaultPlaylistName;
-      }
-
-      // 4) Final fallbacks
-      return status.CurrentPlaylist || 'Active';
-    })();
-
-    const tooltipContent = (
-      <Box sx={{ p: 0.5 }}>
-        <Typography variant="caption" sx={{ display: 'block', fontWeight: 600 }}>
-          Current Playlist: {playlistName || 'N/A'}
-        </Typography>
-        <Typography variant="caption" sx={{ display: 'block' }}>
-          Type: {status.PlaylistType || 'N/A'}
-        </Typography>
-        {status.CurrentMedia && (
-          <Typography variant="caption" sx={{ display: 'block' }}>
-            Media: {status.CurrentMedia}
-          </Typography>
-        )}
-        {status.MediaIndex !== undefined && status.TotalMedia !== undefined && (
-          <Typography variant="caption" sx={{ display: 'block' }}>
-            Progress: {status.MediaIndex + 1}/{status.TotalMedia}
-          </Typography>
-        )}
-        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem' }}>
-          Last Update: {new Date(status.LastUpdate).toLocaleString()}
-        </Typography>
-        <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
-          ({status.SecondsSinceUpdate}s ago)
-        </Typography>
-      </Box>
-    );
-
-    // Check online/offline
+    // Check online/offline FIRST
     const isOnline = status.Status === 'online';
 
     if (!isOnline) {
@@ -273,16 +219,104 @@ const MonitorListResults = (props) => {
       );
     }
 
-    // Online status - show playlist name in green
+    // Determine display name for the playlist
+    const playlistName = (() => {
+      // 1) If status reports a specific playlist (not the generic "Default"), use it.
+      if (status && status.CurrentPlaylist && String(status.CurrentPlaylist).toLowerCase() !== 'default') {
+        return status.CurrentPlaylist;
+      }
+
+      // 2) If CurrentMedia is present, try to find the playlist that contains that media.
+      if (status && status.CurrentMedia) {
+        const pl = findPlaylistContainingMedia(status.CurrentMedia);
+        if (pl) {
+          return pl.Name || pl.PlaylistName || pl.Title || pl.DefaultPlaylistName || 'Playlist';
+        }
+      }
+
+      // 3) Fallback to monitor's DefaultPlaylistName (what's shown in the Default Playlist column).
+      if (monitor && monitor.DefaultPlaylistName) {
+        return monitor.DefaultPlaylistName;
+      }
+
+      // 4) Final fallbacks
+      return status.CurrentPlaylist || 'Active';
+    })();
+
+    // Determine if monitor has health issues
+    const hasHealthIssues = 
+      status.healthStatus === 'warning' || 
+      status.healthStatus === 'error' ||
+      (status.screenState && status.screenState !== 'active') ||
+      (status.errors && status.errors.length > 0) ||
+      status.isProgressing === false;
+
+    const tooltipContent = (
+      <Box sx={{ p: 0.5 }}>
+        <Typography variant="caption" sx={{ display: 'block', fontWeight: 600 }}>
+          Current Playlist: {playlistName || 'N/A'}
+        </Typography>
+        <Typography variant="caption" sx={{ display: 'block' }}>
+          Type: {status.PlaylistType || 'N/A'}
+        </Typography>
+        {status.CurrentMedia && (
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            Media: {status.CurrentMedia}
+          </Typography>
+        )}
+        {status.MediaIndex !== undefined && status.TotalMedia !== undefined && (
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            Progress: {status.MediaIndex + 1}/{status.TotalMedia}
+          </Typography>
+        )}
+        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem' }}>
+          Last Update: {new Date(status.LastUpdate).toLocaleString()}
+        </Typography>
+        <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
+          ({status.SecondsSinceUpdate}s ago)
+        </Typography>
+        
+        {/* Health status information */}
+        {status.healthStatus && (
+          <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+            Health: {status.healthStatus}
+          </Typography>
+        )}
+        {status.screenState && status.screenState !== 'active' && (
+          <Typography variant="caption" sx={{ display: 'block', color: '#ff9800' }}>
+            Screen State: {status.screenState}
+          </Typography>
+        )}
+        {status.isProgressing === false && (
+          <Typography variant="caption" sx={{ display: 'block', color: '#ff9800' }}>
+            ⚠️ Media playback not progressing
+          </Typography>
+        )}
+        {status.errors && status.errors.length > 0 && (
+          <Box sx={{ mt: 0.5 }}>
+            <Typography variant="caption" sx={{ display: 'block', fontWeight: 600, color: '#f44336' }}>
+              Errors:
+            </Typography>
+            {status.errors.map((error, idx) => (
+              <Typography key={idx} variant="caption" sx={{ display: 'block', fontSize: '0.7rem', color: '#f44336' }}>
+                • {error.message || error.type}
+              </Typography>
+            ))}
+          </Box>
+        )}
+      </Box>
+    );
+
+    // Online status - show playlist name with health-aware coloring
     return (
       <Tooltip title={tooltipContent} arrow placement="left">
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Chip 
-            label={playlistName}
+            label={hasHealthIssues ? `${playlistName} ⚠️` : playlistName}
             size="small"
             sx={{ 
-              bgcolor: '#e8f5e9',
-              color: '#2e7d32',
+              bgcolor: hasHealthIssues ? '#fff3e0' : '#e8f5e9',
+              color: hasHealthIssues ? '#e65100' : '#2e7d32',
               fontWeight: 600,
               minWidth: '80px'
             }}
