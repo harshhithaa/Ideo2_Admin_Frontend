@@ -16,27 +16,29 @@ import { connect } from 'react-redux';
 import {
   Box,
   Button,
-  Checkbox,
-  Container,
+  Card,
+  CardContent,
+  CardHeader,
+  Divider,
+  Grid,
   TextField,
-  InputLabel,
-  Select,
-  Typography,
+  Snackbar,
+  Alert,
+  Chip,
   MenuItem,
-  FormControlLabel,
-  FormGroup,
-  FormLabel,
-  FormControl,
-  ListSubheader
+  Select,
+  Modal,
+  Typography,
+  SvgIcon,
+  Container,
+  InputLabel,
+  Checkbox
 } from '@mui/material';
 import { COMPONENTS } from 'src/utils/constant.jsx';
 import { getUserComponentList, saveMonitor } from '../store/action/user';
-import { Alert, Stack } from '@mui/material';
 import { X as CloseIcon, Plus } from 'react-feather';
-import Chip from '@mui/material/Chip';
 import { IsValuePresentInArray } from 'src/utils/helperFunctions';
 import { CancelRounded } from '@material-ui/icons';
-import Snackbar from '@mui/material/Snackbar';
 
 const SaveMonitorDetails = (props) => {
   const { component } = props || null;
@@ -142,42 +144,317 @@ const SaveMonitorDetails = (props) => {
     }
   }, []);
 
+  // ==================== ADD CONFLICT DETECTION FUNCTIONS ====================
+  
+  // Convert time string (HH:MM) to minutes since midnight
+  const timeToMinutes = (timeStr) => {
+    if (!timeStr) return 0;
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  // Normalize day codes/names to standard day codes ('1'-'7')
+  const normalizeDaysToCodes = (daysInput) => {
+    const result = new Set();
+    if (!daysInput) return result;
+
+    const arr = Array.isArray(daysInput) ? daysInput : String(daysInput).split(',').map(s => s.trim());
+    
+    // Day name to code mapping
+    const DAY_NAME_TO_CODE = {
+      monday: '1',
+      tuesday: '2',
+      wednesday: '3',
+      thursday: '4',
+      friday: '5',
+      saturday: '6',
+      sunday: '7'
+    };
+
+    const DAY_CODE_TO_NAME = {
+      '7': 'sunday',
+      '1': 'monday',
+      '2': 'tuesday',
+      '3': 'wednesday',
+      '4': 'thursday',
+      '5': 'friday',
+      '6': 'saturday'
+    };
+    
+    arr.forEach((day) => {
+      if (!day) return;
+      
+      const dayStr = String(day).toLowerCase().trim();
+      
+      // If it's already a code
+      if (DAY_CODE_TO_NAME[dayStr]) {
+        result.add(dayStr);
+      }
+      // If it's a day name
+      else if (DAY_NAME_TO_CODE[dayStr]) {
+        result.add(DAY_NAME_TO_CODE[dayStr]);
+      }
+      // Handle '0' as Sunday ('7')
+      else if (dayStr === '0') {
+        result.add('7');
+      }
+    });
+    
+    return result;
+  };
+
+  // Check if two time ranges overlap
+  const timesOverlap = (start1, end1, start2, end2) => {
+    const s1 = timeToMinutes(start1);
+    const e1 = timeToMinutes(end1);
+    const s2 = timeToMinutes(start2);
+    const e2 = timeToMinutes(end2);
+    
+    // Times overlap if: start1 < end2 AND start2 < end1
+    return s1 < e2 && s2 < e1;
+  };
+
+  // Check if two date ranges overlap
+  const dateRangesOverlap = (start1, end1, start2, end2) => {
+    if (!start1 || !end1 || !start2 || !end2) return true; // If any date is missing, assume overlap
+    
+    // Convert to Date objects for comparison
+    const d1Start = new Date(start1);
+    const d1End = new Date(end1);
+    const d2Start = new Date(start2);
+    const d2End = new Date(end2);
+    
+    // Ranges overlap if: start1 <= end2 AND start2 <= end1
+    return d1Start <= d2End && d2Start <= d1End;
+  };
+
+  // Find conflicting schedules for a monitor
+  const findConflictsForMonitor = (schedulesToAssign, monitorSchedules) => {
+    const conflicts = [];
+    
+    // Check each schedule being assigned against all existing active schedules on this monitor
+    for (const newSchedule of schedulesToAssign) {
+      const newDayCodes = normalizeDaysToCodes(newSchedule.Days);
+      
+      for (const existing of monitorSchedules) {
+        // Skip inactive schedules
+        if (existing.IsActive === 0) {
+          continue;
+        }
+
+        // Skip if comparing with itself (when editing)
+        if (newSchedule.ScheduleRef && existing.ScheduleRef === newSchedule.ScheduleRef) {
+          continue;
+        }
+
+        // Get existing schedule's days
+        const existingDayCodes = normalizeDaysToCodes(existing.Days);
+        
+        // Check if they share ANY common day
+        const hasCommonDay = [...newDayCodes].some(day => existingDayCodes.has(day));
+        
+        if (!hasCommonDay) {
+          continue; // No common days = no conflict
+        }
+
+        // Check if date ranges overlap
+        if (!dateRangesOverlap(
+          newSchedule.StartDate,
+          newSchedule.EndDate,
+          existing.StartDate,
+          existing.EndDate
+        )) {
+          continue; // Date ranges don't overlap = no conflict
+        }
+
+        // Check if time ranges overlap
+        if (!timesOverlap(
+          newSchedule.StartTime,
+          newSchedule.EndTime,
+          existing.StartTime,
+          existing.EndTime
+        )) {
+          continue; // Time ranges don't overlap = no conflict
+        }
+
+        // If we reach here, there's a conflict
+        conflicts.push({
+          newSchedule: newSchedule,
+          existingSchedule: existing
+        });
+      }
+    }
+    
+    return conflicts;
+  };
+
+  // ==================== END CONFLICT DETECTION FUNCTIONS ====================
+
+  // ==================== ADD CONFLICT MODAL STATE ====================
+  const [conflictModal, setConflictModal] = useState({
+    open: false,
+    title: '',
+    message: '',
+    conflicts: []
+  });
+  // ==================================================================
+
   function saveMonitorData() {
-    const selectedSchedules = (selectedScheduleObjects || [])
-      .filter((item) => item && item.ScheduleRef)
-      .map((item) => ({
-        ScheduleRef: item.ScheduleRef,
-        IsActive: 1
-      }));
+    // Build schedules list from selected schedule refs WITH full data for conflict detection
+    const schedulesToAssign = selectedScheduleRefs
+      .map((ref) => {
+        const scheduleObj = scheduleData.find((s) => s.ScheduleRef === ref);
+        if (scheduleObj && scheduleObj.ScheduleRef) {
+          return {
+            ScheduleRef: scheduleObj.ScheduleRef,
+            IsActive: 1,
+            StartTime: scheduleObj.StartTime,
+            EndTime: scheduleObj.EndTime,
+            StartDate: scheduleObj.StartDate,
+            EndDate: scheduleObj.EndDate,
+            Days: scheduleObj.Days,
+            Title: scheduleObj.Title
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
 
     const validDeleted = (deletedSchedules || []).filter((d) => d && d.ScheduleRef);
+
+    // ==================== COMPREHENSIVE CONFLICT DETECTION ====================
+    
+    // STEP 1: Check conflicts among the schedules being assigned (against each other)
+    const internalConflicts = [];
+    for (let i = 0; i < schedulesToAssign.length; i++) {
+      for (let j = i + 1; j < schedulesToAssign.length; j++) {
+        const schedule1 = schedulesToAssign[i];
+        const schedule2 = schedulesToAssign[j];
+        
+        const days1 = normalizeDaysToCodes(schedule1.Days);
+        const days2 = normalizeDaysToCodes(schedule2.Days);
+        
+        // Check if they share any common day
+        const hasCommonDay = [...days1].some(day => days2.has(day));
+        
+        if (hasCommonDay &&
+            dateRangesOverlap(schedule1.StartDate, schedule1.EndDate, schedule2.StartDate, schedule2.EndDate) &&
+            timesOverlap(schedule1.StartTime, schedule1.EndTime, schedule2.StartTime, schedule2.EndTime)) {
+          internalConflicts.push({
+            newSchedule: schedule1,
+            existingSchedule: schedule2
+          });
+        }
+      }
+    }
+
+    // STEP 2: Check conflicts with existing schedules on this monitor
+    const existingMonitorSchedules = state && state.Schedules 
+      ? state.Schedules.filter((s) => s && s.ScheduleRef && s.IsActive === 1)
+      : [];
+
+    const externalConflicts = findConflictsForMonitor(schedulesToAssign, existingMonitorSchedules);
+
+    // Combine all conflicts
+    const allConflicts = [...internalConflicts, ...externalConflicts];
+
+    if (allConflicts.length > 0) {
+      // Build detailed conflict information
+      const DAY_CODE_TO_NAME = {
+        '7': 'Sunday',
+        '1': 'Monday',
+        '2': 'Tuesday',
+        '3': 'Wednesday',
+        '4': 'Thursday',
+        '5': 'Friday',
+        '6': 'Saturday'
+      };
+
+      const conflictDetails = allConflicts.map(c => {
+        const newSch = c.newSchedule;
+        const existingSch = c.existingSchedule;
+        const newDays = normalizeDaysToCodes(newSch.Days);
+        const existingDays = normalizeDaysToCodes(existingSch.Days);
+        
+        const commonDays = [...newDays].filter(day => existingDays.has(day));
+        const commonDayNames = commonDays.map(code => DAY_CODE_TO_NAME[code] || code).join(', ');
+
+        return {
+          schedule1: newSch.Title || 'Untitled Schedule',
+          schedule2: existingSch.Title || 'Untitled Schedule',
+          days: commonDayNames,
+          time1: `${newSch.StartTime} - ${newSch.EndTime}`,
+          time2: `${existingSch.StartTime} - ${existingSch.EndTime}`,
+          dateRange1: `${newSch.StartDate} to ${newSch.EndDate}`,
+          dateRange2: `${existingSch.StartDate} to ${existingSch.EndDate}`
+        };
+      });
+
+      // Show centered modal with detailed conflict information
+      setConflictModal({
+        open: true,
+        title: 'Schedule Conflict Detected',
+        message: 'Cannot save monitor. The following schedules have overlapping time slots:',
+        conflicts: conflictDetails
+      });
+      
+      return; // BLOCK SAVE
+    }
+
+    // ==================== END CONFLICT DETECTION ====================
+
+    // No conflicts - build clean payload for backend
+    const cleanSchedulesForBackend = [
+      ...schedulesToAssign.map(s => ({
+        ScheduleRef: s.ScheduleRef,
+        IsActive: 1
+      })),
+      ...validDeleted.map(d => ({
+        ScheduleRef: d.ScheduleRef,
+        IsActive: 0
+      }))
+    ];
 
     const saveMonitorDetails = {
       MonitorName: title,
       Description: description,
       DefaultPlaylistRef: selectedPlaylist,
-      Schedules: [...selectedSchedules, ...validDeleted],
+      Schedules: cleanSchedulesForBackend,
       IsActive: 1,
       Orientation: orientation === 'Landscape' ? '90' : '0'
     };
-    if (MonitorRef !== '') saveMonitorDetails.MonitorRef = MonitorRef;
+    
+    if (MonitorRef !== '') {
+      saveMonitorDetails.MonitorRef = MonitorRef;
+    }
 
-    console.log('saveMonitorDetails payload:', JSON.stringify(saveMonitorDetails));
+    console.log('saveMonitorDetails payload:', JSON.stringify(saveMonitorDetails, null, 2));
 
     props.saveMonitor(saveMonitorDetails, (err) => {
       if (err.exists) {
-        setcolor('error');
-        setboxMessage(err.err || 'Failed to save monitor');
-        setbox(true);
-        setTimeout(() => {
-          setbox(false);
-        }, 3000);
+        const errorMessage = err.err || err.errmessage || 'Failed to save monitor';
+        
+        // Show error in modal
+        setConflictModal({
+          open: true,
+          title: 'Failed to Save Monitor',
+          message: 'An error occurred while saving the monitor:',
+          conflicts: [{
+            schedule1: 'Error',
+            schedule2: '',
+            days: errorMessage,
+            time1: '',
+            time2: '',
+            dateRange1: '',
+            dateRange2: 'Please check your inputs and try again.'
+          }]
+        });
       } else {
         setcolor('success');
         setboxMessage(`Monitor ${type}d Successfully!`);
         setbox(true);
         
-        const activeRefs = selectedSchedules.map((s) => s.ScheduleRef);
+        const activeRefs = schedulesToAssign.map((s) => s.ScheduleRef);
         setSelectedScheduleRefs(activeRefs);
         setDeletedSchedules([]);
 
@@ -188,6 +465,17 @@ const SaveMonitorDetails = (props) => {
       }
     });
   }
+
+  // ==================== ADD CONFLICT MODAL HANDLER ====================
+  const handleCloseConflictModal = () => {
+    setConflictModal({
+      open: false,
+      title: '',
+      message: '',
+      conflicts: []
+    });
+  };
+  // ====================================================================
 
   const handleChange = (e) => {
     const newRefs = Array.isArray(e.target.value) ? e.target.value.filter(Boolean) : [];
@@ -213,7 +501,6 @@ const SaveMonitorDetails = (props) => {
   };
 
   const handleDateAndTime = () => {
-    // NO CONFLICT CHECKING - Save directly
     saveMonitorData();
   };
 
@@ -641,6 +928,99 @@ const SaveMonitorDetails = (props) => {
           </Box>
         </Container>
       </Box>
+
+      {/* ==================== ADD CONFLICT MODAL ====================*/}
+      <Modal
+        open={conflictModal.open}
+        onClose={handleCloseConflictModal}
+        aria-labelledby="conflict-modal-title"
+        aria-describedby="conflict-modal-description"
+      >
+        <Box sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: { xs: '90%', sm: 600, md: 700 },
+          maxWidth: '90vw',
+          maxHeight: '80vh',
+          bgcolor: 'background.paper',
+          borderRadius: 2,
+          boxShadow: 24,
+          p: 4,
+          overflow: 'auto'
+        }}>
+          {/* Header with Error Icon */}
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+            <SvgIcon sx={{ color: '#d32f2f', fontSize: 40, mr: 2 }}>
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+            </SvgIcon>
+            <Typography id="conflict-modal-title" variant="h5" component="h2" sx={{ fontWeight: 600, color: '#d32f2f' }}>
+              {conflictModal.title}
+            </Typography>
+          </Box>
+
+          {/* Main Message */}
+          <Typography id="conflict-modal-description" sx={{ mb: 3, fontSize: '1rem', color: '#333' }}>
+            {conflictModal.message}
+          </Typography>
+
+          {/* Conflict Details */}
+          <Box sx={{ mb: 3 }}>
+            {conflictModal.conflicts.map((conflict, idx) => (
+              <Box 
+                key={idx} 
+                sx={{ 
+                  mb: 2, 
+                  p: 2, 
+                  bgcolor: '#fff3e0', 
+                  borderLeft: '4px solid #ff9800',
+                  borderRadius: 1
+                }}
+              >
+                <Typography sx={{ fontWeight: 600, mb: 1, color: '#e65100' }}>
+                  Conflict {idx + 1}:
+                </Typography>
+                <Typography sx={{ fontSize: '0.95rem', mb: 0.5 }}>
+                  <strong>"{conflict.schedule1}"</strong> and <strong>"{conflict.schedule2}"</strong>
+                </Typography>
+                <Typography sx={{ fontSize: '0.9rem', color: '#666', ml: 2 }}>
+                  • Common days: <strong>{conflict.days}</strong>
+                </Typography>
+                <Typography sx={{ fontSize: '0.9rem', color: '#666', ml: 2 }}>
+                  • "{conflict.schedule1}" runs: <strong>{conflict.time1}</strong> ({conflict.dateRange1})
+                </Typography>
+                <Typography sx={{ fontSize: '0.9rem', color: '#666', ml: 2 }}>
+                  • "{conflict.schedule2}" runs: <strong>{conflict.time2}</strong> ({conflict.dateRange2})
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+
+          {/* Action Guidance */}
+          <Typography sx={{ mb: 3, p: 2, bgcolor: '#e3f2fd', borderRadius: 1, fontSize: '0.95rem' }}>
+            <strong>To resolve this issue:</strong> Please remove one of the conflicting schedules from this monitor, 
+            or edit the schedules to use different days, times, or date ranges so they don't overlap.
+          </Typography>
+
+          {/* Close Button */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              variant="contained"
+              onClick={handleCloseConflictModal}
+              sx={{
+                bgcolor: '#1976d2',
+                '&:hover': { bgcolor: '#1565c0' },
+                px: 4,
+                py: 1
+              }}
+            >
+              OK, I'll Fix This
+            </Button>
+          </Box>
+        </Box>
+      </Modal>
+      {/* ==================== END CONFLICT MODAL ====================*/}
     </>
   );
 };
