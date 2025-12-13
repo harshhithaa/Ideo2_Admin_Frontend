@@ -661,27 +661,34 @@ const normalizeDaysToCodes = (daysInput) => {
                 py: 1
               }}
             >
-              OK, I'LL FIX THIS
+              OK
             </Button>
           </Box>
         </Box>
       </Modal>
 
-      <Paper
-        elevation={2}
-        sx={{
-          maxWidth: 900,
-          mx: 'auto',
-          mt: 6,
-          mb: 6,
-          p: { xs: 3, sm: 6 },
-          borderRadius: 2
-        }}
-      >
-        <Typography align="center" variant="h5" sx={{ fontWeight: 700, mb: 3 }}>
-          {scheduleRef ? 'Edit Schedule' : 'Create Schedule'}
-        </Typography>
-        <Box sx={{ maxWidth: 860, mx: 'auto', width: '100%' }}>
+<Paper
+  elevation={2}
+  sx={{
+    maxWidth: 900,
+    mx: 'auto',
+    mt: 6,
+    mb: 6,
+    p: { xs: 3, sm: 6 },
+    borderRadius: 2
+  }}
+>
+  <Typography
+    variant="h4"
+    sx={{
+      fontWeight: 600,
+      mb: 3,
+      textAlign: 'center'
+    }}
+  >
+    {scheduleRef ? 'Edit Schedule' : 'Create Schedule'}
+  </Typography>
+  <Box sx={{ maxWidth: 860, mx: 'auto', width: '100%' }}>
           <Box component="form" onSubmit={handleSubmit} noValidate>
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>

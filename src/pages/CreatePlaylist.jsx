@@ -438,7 +438,7 @@ const CreatePlaylist = (props) => {
                   {/* Top area - heading and fields */}
                   <Box sx={{ mb: 1, py: 0.5 }}>
                     {/* Heading styled similar to "Create Split Screen" */}
-                    <Typography variant="h4" sx={{ textAlign: 'left', fontWeight: 700, mb: 1 }}>
+                    <Typography variant="h4" sx={{ textAlign: 'left', fontSize: '26px', fontWeight: 700, mb: 1 }}>
                       {type} Playlist
                     </Typography>
 

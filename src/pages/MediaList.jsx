@@ -42,26 +42,18 @@ const POLL_MAX_ATTEMPTS = 20;
 const MediaList = (props) => {
   const location = useLocation();
   const navigate = useNavigate();
-  // detect navigation kind to decide whether this load is a "fresh navigation" or a refresh/back
   const navigationType = useNavigationType();
 
-  // ✅ CHECK FOR NAVIGATION STATE (from upload) BEFORE LOCALSTORAGE / PUSH handling
   const getInitialTab = () => {
-    // Priority 1: Check if navigated from upload with a specific tab
     if (location.state?.openTab && location.state?.fromUpload) {
       const requestedTab = location.state.openTab;
       if (['IMAGES', 'VIDEOS', 'GIFS'].includes(requestedTab)) {
         return requestedTab;
       }
     }
-
-    // Priority 2: If this load is a PUSH (user clicked a link from another page), treat as fresh navigation -> default to IMAGES
-    // This ensures Dashboard/Playlist/etc. links always open IMAGES
     if (navigationType === 'PUSH') {
       return 'IMAGES';
     }
-
-    // Priority 3: For non-PUSH (refresh/back), restore from localStorage if available
     try {
       const saved = localStorage.getItem(ACTIVE_TAB_KEY);
       if (saved && ['IMAGES', 'VIDEOS', 'GIFS'].includes(saved)) {
@@ -70,8 +62,6 @@ const MediaList = (props) => {
     } catch (e) {
       console.error('Error reading active tab from localStorage:', e);
     }
-
-    // Default fallback
     return 'IMAGES';
   };
 
@@ -79,6 +69,10 @@ const MediaList = (props) => {
   const [selected, setselected] = useState([]);
   const [showmodal, setModal] = useState(false);
   const [showErrModal, setErrModal] = useState(false);
+  const [partialDeleteModal, setPartialDeleteModal] = useState(false); // NEW
+  const [blockedList, setBlockedList] = useState([]); // NEW - blocked media with playlists
+  const [deletableList, setDeletableList] = useState([]); // NEW - refs to delete on proceed
+  const [deletableCount, setDeletableCount] = useState(0); // NEW
   const [playlists, setPlaylists] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState(getInitialTab);
@@ -246,7 +240,7 @@ const MediaList = (props) => {
           const key = item.MediaRef || item.MediaName || item.fileName || item.MediaPath;
           return arr.findIndex(x => {
             const kx = x.MediaRef || x.MediaName || x.fileName || x.MediaPath;
-            return kx && key && kx === key;
+            return kx && key && kx && key && kx === key;
           }) === idx;
         });
 
@@ -359,17 +353,113 @@ const MediaList = (props) => {
     boxShadow: 24, p: 4
   };
 
+  // UPDATED deleteComponent logic to implement:
+  // - auto-delete items not in use
+  // - blocking popup only if ALL selected are in use
+  // - if mixed: show confirmation listing blocked items + which playlists, and allow proceed/cancel for partial deletion
   const deleteComponent = () => {
     const deleteData = { ComponentType: COMPONENTS.Media, ComponentList: selected };
     setModal(false);
+
+    // Ask backend which of the selected are attached
     props.validateDeleteComponentList(deleteData, (err) => {
+      // Generic validation error
       if (err?.exists) {
-        setcolor('error'); setboxMessage('Validation error occurred'); setbox(true); return;
+        setcolor('error'); setboxMessage('Validation error occurred'); setbox(true);
+        return;
       }
+
+      // Backend indicates attachments exist
       if (err?.err === 'attached') {
-        setPlaylists([]); err.componentsAttached.forEach((item) => { setPlaylists((prev) => [...prev, item.PlaylistName]); });
-        setErrModal(true); return;
+        // componentsAttached hopefully contains details of attachments.
+        // Normalize whatever shape we get into { mediaRef, mediaName, playlistName } entries.
+        const attachments = Array.isArray(err.componentsAttached) ? err.componentsAttached : [];
+
+        // Build map: key -> { mediaRef, mediaName, playlists:Set }
+        const map = {};
+        const allPlaylistNamesSet = new Set();
+
+        attachments.forEach((a) => {
+          const mediaRef = a.MediaRef || a.ComponentRef || a.componentRef || a.Component || null;
+          const mediaName = a.MediaName || a.ComponentName || a.componentName || a.Name || a.MediaName || '';
+          const playlistName = a.PlaylistName || a.Playlist || a.playlistName || a.AttachedTo || a.PlaylistName || '';
+
+          const key = mediaRef || mediaName || JSON.stringify(a);
+
+          if (!map[key]) {
+            map[key] = {
+              mediaRef: mediaRef || null,
+              mediaName: mediaName || (mediaRef ? mediaRef : 'Unknown'),
+              playlists: new Set()
+            };
+          }
+          if (playlistName) {
+            map[key].playlists.add(playlistName);
+            allPlaylistNamesSet.add(playlistName);
+          }
+        });
+
+        // Convert map to array
+        const blockedArrayAll = Object.keys(map).map((k) => ({
+          mediaRef: map[k].mediaRef,
+          mediaName: map[k].mediaName,
+          playlists: Array.from(map[k].playlists)
+        }));
+
+        // Now determine which of the currently selected items are blocked.
+        // selected[] contains MediaRef strings (usually). We'll match by mediaRef first, then by mediaName.
+        const selectedSet = new Set(selected || []);
+        const blockedSelectedSet = new Set();
+        const blockedSelectedArray = [];
+
+        blockedArrayAll.forEach((b) => {
+          let matched = false;
+          if (b.mediaRef && selectedSet.has(b.mediaRef)) {
+            blockedSelectedSet.add(b.mediaRef);
+            matched = true;
+          } else if (b.mediaName && selectedSet.has(b.mediaName)) {
+            blockedSelectedSet.add(b.mediaName);
+            matched = true;
+          } else {
+            // also try matching by name vs server items in mediaItem list (fallback)
+            const matchedByMeta = (selected || []).find(sel => {
+              // try find corresponding media in current state to compare names
+              const found = mediaItem.find(mi => (mi.MediaRef === sel || mi.MediaName === sel));
+              if (!found) return false;
+              const name = found.MediaName || found.MediaName;
+              return name && b.mediaName && name === b.mediaName;
+            });
+            if (matchedByMeta) {
+              blockedSelectedSet.add(matchedByMeta);
+              matched = true;
+            }
+          }
+          if (matched) blockedSelectedArray.push(b);
+        });
+
+        // deletable = those selected that are NOT in blockedSelectedSet
+        const deletable = (selected || []).filter(s => !blockedSelectedSet.has(s));
+
+        // CASE A: All selected are blocked -> show existing blocking modal listing playlists (unchanged UX)
+        if (deletable.length === 0) {
+          // Show the old modal which lists playlists where ANY of the selected are used.
+          // Build unique playlist list
+          const playlistNames = Array.from(allPlaylistNamesSet);
+          setPlaylists(playlistNames);
+          setErrModal(true);
+          return;
+        }
+
+        // CASE B: Some selectable, some blocked -> show confirmation dialog with details (partial delete)
+        // Prepare blockedList that's relevant only to selected items (blockedSelectedArray)
+        setBlockedList(blockedSelectedArray);
+        setDeletableList(deletable);
+        setDeletableCount(deletable.length);
+        setPartialDeleteModal(true);
+        return;
       }
+
+      // CASE C: No attachments -> proceed to delete all selected automatically
       props.deleteComponentList(deleteData, (delErr) => {
         if (delErr?.exists) {
           setcolor('error'); setboxMessage(delErr.err || delErr.errmessage || 'Delete failed'); setbox(true);
@@ -385,6 +475,30 @@ const MediaList = (props) => {
           fetchMediaList(getCurrentPage(), mediaType, searchQuery, { setDisplay: true });
         }
       });
+    });
+  };
+
+  // Proceed with partial deletion (user confirmed)
+  const proceedPartialDelete = () => {
+    const deleteData = { ComponentType: COMPONENTS.Media, ComponentList: deletableList };
+    setPartialDeleteModal(false);
+
+    props.deleteComponentList(deleteData, (delErr) => {
+      if (delErr?.exists) {
+        setcolor('error'); setboxMessage(delErr.err || delErr.errmessage || 'Delete failed'); setbox(true);
+      } else {
+        setcolor('success'); setboxMessage(`${deletableList.length} item(s) deleted`); setbox(true);
+        // clear selection of deleted items
+        setselected((prev) => (prev || []).filter(r => !deletableList.includes(r)));
+
+        // refresh
+        let mediaType = '';
+        if (activeTab === 'IMAGES') mediaType = 'image';
+        else if (activeTab === 'VIDEOS') mediaType = 'video';
+        else if (activeTab === 'GIFS') mediaType = 'gif';
+
+        fetchMediaList(getCurrentPage(), mediaType, searchQuery, { setDisplay: true });
+      }
     });
   };
 
@@ -579,71 +693,103 @@ const MediaList = (props) => {
     const thumb = buildSrc(item?.Thumbnail || item?.MediaThumb || item?.Poster);
     const rawType = (item?.MediaType || '').toString().toLowerCase();
 
-    const isProcessing = item.isProcessing || item.processing || item.isProcessing === true;
-    const progressPct = Math.min(100, Number(item.processingProgress || 0));
+    const isProcessing = item.isProcessing || item.processing || false;
 
-    const isGif = rawType === 'gif';
-    const isVideo = rawType === 'video';
-    const isImage = rawType === 'image';
+    const isGif = rawType === 'gif' || 
+                  rawType.includes('gif') || 
+                  (item?.MediaName || '').toLowerCase().endsWith('.gif');
+    
+    const isVideo = rawType === 'video' || 
+                    rawType.includes('video') ||
+                    (item?.MediaName || '').toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
 
-    const isSelected = selected.indexOf(item.MediaRef) !== -1;
+    const imgOnError = (e) => {
+      e.currentTarget.style.display = 'none';
+      const parent = e.currentTarget.parentElement;
+      if (parent && !parent.querySelector('.ig-placeholder')) {
+        const ph = document.createElement('div');
+        ph.className = 'ig-placeholder';
+        ph.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#f4f4f4;color:#999';
+        ph.innerText = 'No media';
+        parent.appendChild(ph);
+      }
+    };
 
     return (
-      <Box key={item.MediaRef} onClick={() => toggleSelection(item.MediaRef)}
-        sx={{
-          position: 'relative', borderRadius: '8px', overflow: 'hidden',
-          bgcolor: '#fff', cursor: 'pointer',
-          border: isSelected ? '2px solid #1976d2' : '1px solid #e5e7eb',
-          transition: 'all 0.2s ease', 
-          '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.1)', transform: 'translateY(-2px)' }
+      <div
+        key={item.MediaRef}
+        onClick={() => toggleSelection(item.MediaRef)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleSelection(item.MediaRef); }}
+        style={{
+          position: 'relative',
+          borderRadius: 8,
+          overflow: 'hidden',
+          background: '#fff',
+          cursor: 'pointer',
+          border: selected.indexOf(item.MediaRef) !== -1 ? '2px solid rgba(25,118,210,0.28)' : '1px solid rgba(0,0,0,0.06)',
+          transition: 'border 0.2s ease'
         }}
       >
-        <Checkbox checked={isSelected} onClick={(e) => e.stopPropagation()} 
+        <Checkbox
+          style={{ position: 'absolute', left: 8, top: 8, zIndex: 5, background: 'transparent' }}
+          checked={selected.indexOf(item.MediaRef) !== -1}
+          onClick={(e) => e.stopPropagation()}
           onChange={() => toggleSelection(item.MediaRef)}
-          sx={{ position: 'absolute', left: 8, top: 8, zIndex: 5, bgcolor: 'transparent' }} />
-        
-        <Box sx={{ width: '100%', paddingTop: '100%', position: 'relative', bgcolor: '#f4f4f4' }}>
+        />
+
+        <div style={{ width: '100%', paddingTop: '100%', position: 'relative', background: '#f4f4f4' }}>
           {isProcessing ? (
-            <Box sx={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-              <Box sx={{ width: '80%', bgcolor: '#e0e0e0', height: 10, borderRadius: 2, overflow: 'hidden' }}>
-                <Box sx={{ width: `${progressPct}%`, height: '100%', bgcolor: '#5b67d6', transition: 'width 0.3s' }} />
-              </Box>
-              {/* show only label (no percentage) */}
-              <Typography variant="caption" color="text.secondary">
-                {progressPct >= 100 ? 'Finalizing...' : 'Processing...'}
-              </Typography>
-            </Box>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <div style={{ width: '80%' }}>
+                <div style={{ background: '#e0e0e0', height: 6, borderRadius: 3 }} />
+              </div>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>Processing...</Typography>
+            </div>
           ) : (
             isVideo ? (
               thumb ? (
-                <img src={thumb} alt={item.MediaName} 
-                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img
+                  src={thumb}
+                  alt={item.MediaName || item.MediaRef}
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={imgOnError}
+                />
               ) : src ? (
-                <video src={src} 
-                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} 
-                  muted playsInline />
+                <video
+                  src={src}
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#000' }}
+                  preload="metadata"
+                  muted
+                  playsInline
+                />
               ) : (
-                <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
-                  No media
-                </Box>
+                <div style={{ position: 'absolute', inset: 0 }}>
+                  <div style={{ display:'flex',alignItems:'center',justifyContent:'center',background:'#f4f4f4',color:'#999',width:'100%',height:'100%'}}>No media</div>
+                </div>
               )
             ) : (
               src ? (
-                <img src={src} alt={item.MediaName} 
-                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img
+                  src={src}
+                  alt={item.MediaName || item.MediaRef}
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={imgOnError}
+                />
               ) : (
-                <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
-                  No media
-                </Box>
+                <div style={{ position: 'absolute', inset: 0 }}>
+                  <div style={{ display:'flex',alignItems:'center',justifyContent:'center',background:'#f4f4f4',color:'#999',width:'100%',height:'100%'}}>No media</div>
+                </div>
               )
             )
           )}
-        </Box>
-        
-        <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px', bgcolor: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        </div>
+
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '8px', background: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: 13 }}>
           {item.MediaName}
-        </Box>
-      </Box>
+        </div>
+      </div>
     );
   };
 
@@ -774,6 +920,7 @@ const MediaList = (props) => {
             </Box>
           </Modal>
 
+          {/* Blocking modal (unchanged UX, shown when ALL selected are in use) */}
           <Modal open={showErrModal} onClose={() => setErrModal(false)}>
             <Box sx={style}>
               <h4 style={{ marginBottom: 20 }}>Cannot delete this media as it is running in these playlists:</h4>
@@ -781,6 +928,45 @@ const MediaList = (props) => {
               <Grid container><Grid item>
                 <Button variant="contained" color="success" onClick={() => { setErrModal(false); setPlaylists([]); }}>Ok</Button>
               </Grid></Grid>
+            </Box>
+          </Modal>
+
+          {/* Partial-delete confirmation modal (NEW) */}
+          <Modal open={partialDeleteModal} onClose={() => setPartialDeleteModal(false)}>
+            <Box sx={style}>
+              <h4 style={{ marginBottom: 12 }}>Some selected media cannot be deleted</h4>
+
+              <Typography sx={{ mb: 1 }}>
+                The following media files are currently active in playlists and will NOT be deleted:
+              </Typography>
+
+              <Box sx={{ maxHeight: 200, overflowY: 'auto', mb: 2 }}>
+                {blockedList.map((b, idx) => (
+                  <Box key={idx} sx={{ mb: 1 }}>
+                    <Typography sx={{ fontWeight: 600 }}>{b.mediaName}</Typography>
+                    <Typography variant="body2" sx={{ color: 'text.secondary', ml: 1 }}>
+                      (active in: {b.playlists && b.playlists.length > 0 ? b.playlists.join(', ') : 'Unknown'})
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+
+              <Typography sx={{ mb: 2 }}>
+                {deletableCount} of {selected.length} selected file{selected.length !== 1 ? 's' : ''} will be deleted. Do you want to proceed?
+              </Typography>
+
+              <Grid container spacing={2} justifyContent="center">
+                <Grid item>
+                  <Button variant="contained" color="success" onClick={proceedPartialDelete}>
+                    Yes, proceed
+                  </Button>
+                </Grid>
+                <Grid item>
+                  <Button variant="contained" color="error" onClick={() => setPartialDeleteModal(false)}>
+                    Cancel
+                  </Button>
+                </Grid>
+              </Grid>
             </Box>
           </Modal>
 

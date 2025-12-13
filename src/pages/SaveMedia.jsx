@@ -28,7 +28,9 @@ const baseStyle = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  padding: '48px',
+  justifyContent: 'center',    
+  textAlign: 'center',         
+  padding: '64px',           
   margin: 0,
   borderWidth: 2,
   borderRadius: 6,
@@ -37,6 +39,10 @@ const baseStyle = {
   backgroundColor: '#ffffff',
   color: '#9e9e9e',
   transition: 'border .24s ease-in-out'
+  ,
+  minHeight: 320,           
+  width: '100%',
+  boxSizing: 'border-box'
 };
 
 const activeStyle = { borderColor: '#1976d2' };
@@ -412,6 +418,21 @@ function SaveMedia(props) {
   return (
     <Grid container direction="column" sx={{ minHeight: '100vh', alignItems: 'center', justifyContent: 'center' }}>
       <Helmet><title>Add Media | Ideogram</title></Helmet>
+
+      {/* Header - moved up visually without affecting layout below */}
+      <div style={{ position: 'relative', top: '-60px', marginBottom: '8px', textAlign: 'center', width: '100%' }}>
+        <h1
+          style={{
+            fontSize: '26px',
+            fontWeight: 600,
+            margin: 0,
+            color: 'inherit',
+            display: 'inline-block'
+          }}
+        >
+          ADD MEDIA
+        </h1>
+      </div>
 
       <Dialog
         open={openSnackbar}

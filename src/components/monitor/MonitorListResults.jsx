@@ -32,6 +32,53 @@ const MonitorListResults = (props) => {
   const [loadingStatus, setLoadingStatus] = useState({});
   const [monitorStatuses, setMonitorStatuses] = useState({});
 
+  // Helper to format date from YYYY-MM-DD (or any parseable date) to DD/MM/YYYY
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    // Try native Date parse first
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    }
+    // Fallback for YYYY-MM-DD or similar
+    const parts = String(dateStr).split(/[-\/]/);
+    if (parts.length >= 3) {
+      const [y, m, d2] = parts;
+      return `${String(d2).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
+    }
+    return dateStr;
+  };
+
+  // Helper to format "Last seen" without seconds (HH:MM AM/PM)
+  const formatLastSeen = (ts) => {
+    if (!ts) return 'N/A';
+    try {
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return String(ts);
+      
+      // Format date part
+      const datePart = d.toLocaleDateString(undefined, { 
+        month: 'numeric', 
+        day: 'numeric', 
+        year: 'numeric' 
+      });
+      
+      // Format time part without seconds
+      const timePart = d.toLocaleTimeString(undefined, { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+      
+      return `${datePart}, ${timePart}`;
+    } catch (e) {
+      return String(ts);
+    }
+  };
+
   const filtered = monitors
     ? monitors.filter((item) =>
         (item.MonitorName || item.Name || '').toString().toLowerCase().includes((search || '').toLowerCase())
@@ -192,7 +239,7 @@ const MonitorListResults = (props) => {
 
     if (!isOnline) {
       return (
-        <Tooltip title={`Last seen: ${new Date(status.LastUpdate).toLocaleString()}`} arrow>
+        <Tooltip title={`Last seen: ${formatLastSeen(status.LastUpdate)}`} arrow>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Chip 
               label="Offline" 
@@ -373,15 +420,21 @@ const MonitorListResults = (props) => {
         <Tooltip
           title={
             <Box sx={{ p: 0.5, maxHeight: '400px', overflowY: 'auto' }}>
+              {/* Show schedule name with explicit label */}
               <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>
-                {name}
+                Schedule Name: {name}
               </Typography>
+
+              {/* DATES first (DD/MM/YYYY) */}
+              <Typography variant="caption" sx={{ display: 'block' }}>
+                Dates: {formatDate(schedule?.StartDate) || 'N/A'} to {formatDate(schedule?.EndDate) || 'N/A'}
+              </Typography>
+
+              {/* TIME after dates */}
               <Typography variant="caption" sx={{ display: 'block' }}>
                 Time: {schedule?.StartTime || 'N/A'} - {schedule?.EndTime || 'N/A'}
               </Typography>
-              <Typography variant="caption" sx={{ display: 'block' }}>
-                Dates: {schedule?.StartDate || 'N/A'} to {schedule?.EndDate || 'N/A'}
-              </Typography>
+
               {schedule?.Days && (
                 <Typography variant="caption" sx={{ display: 'block' }}>
                   Days: {Array.isArray(schedule.Days) ? schedule.Days.join(', ') : schedule.Days}
@@ -428,15 +481,21 @@ const MonitorListResults = (props) => {
                     borderBottom: idx < schedules.length - 1 ? '1px solid rgba(255,255,255,0.2)' : 'none'
                   }}
                 >
+                  {/* Show schedule name with explicit label */}
                   <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>
-                    {name}
+                    Schedule Name: {name}
                   </Typography>
+
+                  {/* DATES first (DD/MM/YYYY) */}
+                  <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
+                    Dates: {formatDate(schedule?.StartDate) || 'N/A'} to {formatDate(schedule?.EndDate) || 'N/A'}
+                  </Typography>
+
+                  {/* TIME after dates */}
                   <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
                     Time: {schedule?.StartTime || 'N/A'} - {schedule?.EndTime || 'N/A'}
                   </Typography>
-                  <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
-                    Dates: {schedule?.StartDate || 'N/A'} to {schedule?.EndDate || 'N/A'}
-                  </Typography>
+
                   {schedule?.Days && (
                     <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
                       Days: {Array.isArray(schedule.Days) ? schedule.Days.join(', ') : schedule.Days}
@@ -484,6 +543,7 @@ const MonitorListResults = (props) => {
       // Common possible media arrays used in different API shapes
       const candidateArrays = [
         pl.MediaList,
+        pl.Media,
         pl.Media,
         pl.Medias,
         pl.Items,
@@ -555,12 +615,12 @@ const MonitorListResults = (props) => {
                   Monitor Name
                 </TableCell>
 
-                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '30%' }}>
+                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '20%' }}>
                   Description
                 </TableCell>
 
                 <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '15%' }}>
-                  Scheduled Playlists
+                  Schedule Names
                 </TableCell>
 
                 <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '15%' }}>
@@ -568,7 +628,7 @@ const MonitorListResults = (props) => {
                 </TableCell>
 
                 <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '12%' }}>
-                  Status
+                  Status (Playlist Name)
                 </TableCell>
 
                 <TableCell align="center" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '8%' }}>

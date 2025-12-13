@@ -83,7 +83,7 @@ const CustomizedMedia = () => {
         <Typography
           gutterBottom
           variant="h4"
-          sx={{ padding: '8px 0', color: 'text.primary', fontWeight: 600 }}
+          sx={{ padding: '8px 0', color: 'text.primary', fontSize: '26px', fontWeight: 600 }}
         >
           Create Media
         </Typography>
