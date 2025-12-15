@@ -260,8 +260,9 @@ const MediaList = (props) => {
 
     // when switching tab normally, show results for that tab
     fetchMediaList(getCurrentPage(), mediaType, searchQuery, { setDisplay: true });
-    // clear selection when tab changes
-    setselected([]);
+
+    // Persist selection across tabs — do NOT clear selected here.
+    // setselected([]);  <-- removed to keep selections when switching tabs
   }, [activeTab]);
 
   // ✅ REFETCH WHEN PAGE CHANGES -> display for current tab
@@ -328,12 +329,13 @@ const MediaList = (props) => {
 
     // switch to target tab and display its componentList
     setActiveTab(targetTab);
-    setselected([]);
+    // Persist selection across tabs — do NOT clear selected when search switches tab.
+    // setselected([]);  <-- removed to keep selections when switching tabs via search
     // reset page for that tab to 1
     if (targetTab === 'IMAGES') setImagePage(1);
     if (targetTab === 'VIDEOS') setVideoPage(1);
     if (targetTab === 'GIFS') setGifPage(1);
-
+    
     // display the results for the chosen tab
     if (targetTab === 'IMAGES') setMedia(imgRes.componentList || []);
     if (targetTab === 'VIDEOS') setMedia(vidRes.componentList || []);
