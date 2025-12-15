@@ -908,7 +908,7 @@ const MediaList = (props) => {
         </Stack>
       )}
 
-      <Box sx={{ bgcolor: '#f5f5f5', minHeight: '100vh', py: 3 }}>
+      <Box sx={{ bgcolor: '#f5f5f5', minHeight: '100%', py: 3 }}>
         <Container maxWidth={false}>
           <Modal open={showmodal} onClose={() => setModal(false)}>
             <Box sx={style}>
@@ -1067,7 +1067,13 @@ const MediaList = (props) => {
                 </Box>
               </Box>
 
-              <Box sx={{ p: 3, maxHeight: 'calc(100vh - 280px)', overflowY: 'auto', bgcolor: '#fff' }}>
+              <Box sx={{ 
+                p: 3, 
+                height: 'calc(100vh - 280px)',
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                bgcolor: '#fff' 
+              }}>
                 {(!mediaItem || mediaItem.length === 0) ? (
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
                     <Typography variant="body1" color="text.secondary">

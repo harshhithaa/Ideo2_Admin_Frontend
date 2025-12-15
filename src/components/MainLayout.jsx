@@ -26,7 +26,9 @@ const MainLayoutContainer = styled('div')({
 const MainLayoutContent = styled('div')({
   flex: '1 1 auto',
   height: '100%',
-  overflow: 'hidden'
+  overflowY: 'auto',   // enable vertical scrolling on the main content container
+  overflowX: 'hidden',
+  WebkitOverflowScrolling: 'touch'
 });
 
 const MainLayout = () => (

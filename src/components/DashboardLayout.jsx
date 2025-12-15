@@ -34,7 +34,9 @@ const DashboardLayoutContainer = styled('div')({
 const DashboardLayoutContent = styled('div')({
   flex: '1 1 auto',
   height: '100%',
-  overflow: 'hidden'    // components inside must handle their own scroll
+  overflowY: 'auto',    // allow vertical scrolling on the main content container
+  overflowX: 'hidden',
+  WebkitOverflowScrolling: 'touch' // smooth scrolling on supported devices
 });
 
 const DashboardLayout = () => {

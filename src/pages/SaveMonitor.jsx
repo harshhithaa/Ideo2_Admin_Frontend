@@ -552,7 +552,10 @@ const SaveMonitorDetails = (props) => {
               bgcolor: 'background.paper',
               borderRadius: 2,
               p: { xs: 2, sm: 4 },
-              boxShadow: 1
+              boxShadow: 1,
+              maxHeight: 'calc(100vh - 96px)',
+              overflowY: 'auto',
+              overflowX: 'hidden',
             }}
           >
             <Formik
@@ -626,18 +629,29 @@ const SaveMonitorDetails = (props) => {
                           sx={{
                             height: 40,
                             borderRadius: 1,
-                            border: '1px solid',
-                            borderColor: 'divider',
+                            border: '1px solid rgba(0, 0, 0, 0.23)',
                             px: 2,
                             py: 1,
                             width: '100%',
                             boxSizing: 'border-box',
                             display: 'flex',
                             alignItems: 'center',
-                            bgcolor: 'action.disabledBackground'
+                            bgcolor: '#fff'
                           }}
                         >
-                          <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <Typography
+                            sx={{
+                              fontSize: '1rem',
+                              fontWeight: 400,
+                              fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+                              lineHeight: 1.5,
+                              letterSpacing: '0.00938em',
+                              color: 'rgba(0, 0, 0, 0.87)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
                             {playlistData && playlistData.length > 0
                               ? (playlistData.find((p) => p.PlaylistRef === selectedPlaylist) || {}).Name || 'No Items available'
                               : 'No Items available'}
@@ -677,18 +691,29 @@ const SaveMonitorDetails = (props) => {
                           sx={{
                             height: 40,
                             borderRadius: 1,
-                            border: '1px solid',
-                            borderColor: 'divider',
+                            border: '1px solid rgba(0, 0, 0, 0.23)',
                             px: 2,
                             py: 1,
                             width: '100%',
                             boxSizing: 'border-box',
                             display: 'flex',
                             alignItems: 'center',
-                            bgcolor: 'action.disabledBackground'
+                            bgcolor: '#fff'
                           }}
                         >
-                          <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <Typography
+                            sx={{
+                              fontSize: '1rem',
+                              fontWeight: 400,
+                              fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+                              lineHeight: 1.5,
+                              letterSpacing: '0.00938em',
+                              color: 'rgba(0, 0, 0, 0.87)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
                             {orientation || 'Not set'}
                           </Typography>
                         </Box>
@@ -722,15 +747,14 @@ const SaveMonitorDetails = (props) => {
                           sx={{
                             height: 135,
                             borderRadius: 1,
-                            border: '1px solid',
-                            borderColor: 'divider',
+                            border: '1px solid rgba(0, 0, 0, 0.23)',
                             px: 1,
                             py: 0.5,
                             width: '100%',
                             boxSizing: 'border-box',
                             display: 'flex',
                             alignItems: 'flex-start',
-                            bgcolor: 'action.disabledBackground'
+                            bgcolor: '#fff'
                           }}
                         >
                           <div
@@ -750,20 +774,44 @@ const SaveMonitorDetails = (props) => {
                                 <div key={index} style={{ width: '90%' }}>
                                   <Chip
                                     label={`${value.Title} (${value.StartTime || ''} - ${value.EndTime || ''}) (${value.StartDate || ''} - ${value.EndDate || ''})`}
-                                    style={{
-                                      margin: 2,
+                                    sx={{
+                                      margin: 0.5,
                                       width: '100%',
                                       boxSizing: 'border-box',
                                       overflow: 'hidden',
                                       whiteSpace: 'nowrap',
                                       textOverflow: 'ellipsis',
-                                      position: 'relative'
+                                      position: 'relative',
+                                      '& .MuiChip-label': {
+                                        fontSize: '1rem',
+                                        fontWeight: 400,
+                                        fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+                                        lineHeight: 1.5,
+                                        letterSpacing: '0.00938em',
+                                        color: 'rgba(0, 0, 0, 0.87)',
+                                        padding: '6px 12px'
+                                      }
                                     }}
                                   />
                                 </div>
                               ))
                             ) : (
-                              <Typography variant="body2">No Items available</Typography>
+                              <Typography
+                                sx={{
+                                  fontSize: '1rem',
+                                  fontWeight: 400,
+                                  fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+                                  lineHeight: 1.5,
+                                  letterSpacing: '0.00938em',
+                                  color: 'rgba(0, 0, 0, 0.6)',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  px: 1
+                                }}
+                              >
+                                No Items available
+                              </Typography>
                             )}
                           </div>
                         </Box>

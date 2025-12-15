@@ -316,6 +316,13 @@ const MonitorListResults = (props) => {
             Progress: {status.MediaIndex + 1}/{status.TotalMedia}
           </Typography>
         )}
+        {/* ✅ Show cache status */}
+        {status.isCachedPlaylist && (
+          <Typography variant="caption" sx={{ display: 'block', color: '#ff9800', fontWeight: 600, mt: 0.5 }}>
+            ⚠️ Using Cached Playlist
+            {status.cacheAge !== null && ` (${status.cacheAge} days old)`}
+          </Typography>
+        )}
         <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem' }}>
           Last Update: {new Date(status.LastUpdate).toLocaleString()}
         </Typography>
@@ -342,11 +349,15 @@ const MonitorListResults = (props) => {
         {status.errors && status.errors.length > 0 && (
           <Box sx={{ mt: 0.5 }}>
             <Typography variant="caption" sx={{ display: 'block', fontWeight: 600, color: '#f44336' }}>
-              Errors:
+              {status.errors.some(e => e.severity === 'error') ? 'Errors:' : 'Warnings:'}
             </Typography>
             {status.errors.map((error, idx) => (
-              <Typography key={idx} variant="caption" sx={{ display: 'block', fontSize: '0.7rem', color: '#f44336' }}>
-                • {error.message || error.type}
+              <Typography key={idx} variant="caption" sx={{ 
+                display: 'block', 
+                fontSize: '0.7rem', 
+                color: error.severity === 'error' ? '#f44336' : '#ff9800'
+              }}>
+                {error.severity === 'error' ? '❌' : '⚠️'} {error.message || error.type}
               </Typography>
             ))}
           </Box>

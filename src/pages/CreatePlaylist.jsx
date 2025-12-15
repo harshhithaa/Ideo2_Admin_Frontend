@@ -422,7 +422,23 @@ const CreatePlaylist = (props) => {
             overflowY: 'auto',
             overflowX: 'hidden',
             height: '100%',
-            py: 3
+            py: 3,
+            // Explicitly ensure scrollbar styling is applied
+            '&::-webkit-scrollbar': {
+              width: '10px'
+            },
+            '&::-webkit-scrollbar-track': {
+              background: '#f3f4f6',
+              borderRadius: '8px'
+            },
+            '&::-webkit-scrollbar-thumb': {
+              backgroundColor: '#cbd5e1',
+              borderRadius: '8px',
+              border: '2px solid #f3f4f6'
+            },
+            '&::-webkit-scrollbar-thumb:hover': {
+              backgroundColor: '#b6c2cc'
+            }
           }}
         >
           <Container
@@ -557,7 +573,23 @@ const CreatePlaylist = (props) => {
                           </Box>
                         </Box>
 
-                        <Box sx={{ flex: 1, overflowY: 'auto', pr: 0.5 }}>
+                        <Box sx={{ flex: 1, overflowY: 'auto', pr: 0.5,
+                          '&::-webkit-scrollbar': {
+                            width: '10px'
+                          },
+                          '&::-webkit-scrollbar-track': {
+                            background: '#f3f4f6',
+                            borderRadius: '8px'
+                          },
+                          '&::-webkit-scrollbar-thumb': {
+                            backgroundColor: '#cbd5e1',
+                            borderRadius: '8px',
+                            border: '2px solid #f3f4f6'
+                          },
+                          '&::-webkit-scrollbar-thumb:hover': {
+                            backgroundColor: '#b6c2cc'
+                          }
+                        }}>
                           <MediaGrid media={media} setselected={onGridSelectionChange} selected={selectedRefs} columns={6} />
                         </Box>
 
