@@ -8,7 +8,7 @@ import { Formik } from 'formik';
 import React, { useState, useEffect } from 'react';
 import CardMedia from '@mui/material/CardMedia';
 import { Alert, Stack, Checkbox, Snackbar } from '@mui/material';
-import { Box, Button, Container, TextField, Typography, Grid, MenuItem, Select, FormControl, InputLabel, IconButton, Tooltip } from '@mui/material';
+import { Box, Button, Container, TextField, Typography, Grid, MenuItem, Select, FormControl, InputLabel, IconButton, Tooltip, InputAdornment } from '@mui/material';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -39,6 +39,8 @@ const VideoThumbnail = ({ videoUrl, alt }) => {
     </Box>
   );
 };
+
+const DESCRIPTION_MAX_LENGTH = 45;
 
 const CreatePlaylist = (props) => {
   const navigate = useNavigate();
@@ -309,6 +311,15 @@ const CreatePlaylist = (props) => {
       window.scrollTo(0, 0);
       return;
     }
+
+    // enforce DB-sized description limit on frontend
+    if (description && description.length > DESCRIPTION_MAX_LENGTH) {
+      setbox(true);
+      setcolor('error');
+      setboxMessage(`Description cannot exceed ${DESCRIPTION_MAX_LENGTH} characters.`);
+      return;
+    }
+
     const sanitizedPlaylist = playlistMedia.map((p) => {
       const isVideo = isVideoRef(p.MediaRef);
       let dur = p.Duration;
@@ -481,16 +492,25 @@ const CreatePlaylist = (props) => {
                         <TextField
                           error={Boolean(touched.description && errors.description)}
                           fullWidth
-                          helperText={touched.description && errors.description}
                           label="Description"
                           margin="dense"
                           name="description"
                           onBlur={handleBlur}
-                          onChange={(e) => setDescription(e.target.value)}
+                          onChange={(e) => setDescription((e.target.value || '').slice(0, DESCRIPTION_MAX_LENGTH))}
                           value={description}
                           variant="outlined"
                           disabled={isViewMode}
                           InputLabelProps={{ sx: { color: 'text.primary', fontWeight: 550, fontSize: '1rem' } }}
+                          inputProps={{ maxLength: DESCRIPTION_MAX_LENGTH }}
+                          InputProps={{
+                            endAdornment: (
+                              <InputAdornment position="end" sx={{ mr: 1, pointerEvents: 'none' }}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                  {description.length}/{DESCRIPTION_MAX_LENGTH}
+                                </Typography>
+                              </InputAdornment>
+                            )
+                          }}
                           sx={{ '& .MuiInputBase-input': { color: 'text.primary', fontSize: '1rem', lineHeight: 1.2 }, mt: 0.5 }}
                         />
                       </Grid>

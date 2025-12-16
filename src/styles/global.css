@@ -1,0 +1,305 @@
+/* global.css - responsive defaults for desktop/tablet/phone */
+
+/* Reset & base */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  background: #f6f8fa;
+  color: #111827;
+  line-height: 1.4;
+  overscroll-behavior-y: contain; /* prevent body jump on touch */
+}
+
+/* Make app scroll area smooth on iOS */
+#root, .app-root, .MuiContainer-root {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Image/video defaults */
+img, picture, video, canvas { max-width: 100%; height: auto; display: block; object-fit: cover; }
+
+/* Utility container */
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 12px;
+}
+
+/* Panel card */
+.panel {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 1px 4px rgba(16,24,40,0.05);
+  border: 1px solid rgba(0,0,0,0.04);
+  overflow: hidden;
+}
+
+/* Table responsive wrapper: horizontal scroll with touch momentum */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* Default table styling (desktop-ish) */
+.table-responsive table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+.table-responsive th,
+.table-responsive td {
+  padding: 10px 12px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* Small screens: transform table into stacked cards */
+@media (max-width: 720px) {
+  .table-responsive table,
+  .table-responsive thead,
+  .table-responsive tbody,
+  .table-responsive th,
+  .table-responsive td,
+  .table-responsive tr {
+    display: block;
+    width: 100%;
+  }
+
+  .table-responsive thead { display: none; }
+
+  .table-responsive tbody tr {
+    display: block;
+    margin-bottom: 12px;
+    padding: 10px;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid #eee;
+  }
+
+  .table-responsive td {
+    display: block;
+    text-align: right;
+    padding: 6px 0;
+    border: none;
+    white-space: normal;
+  }
+
+  .table-responsive td::before {
+    content: attr(data-label);
+    float: left;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    color: #333;
+    margin-right: 8px;
+  }
+
+  /* left-aligned cells (checkboxes, icons, actions) */
+  .table-responsive td._left,
+  .table-responsive td._actions {
+    text-align: left;
+  }
+}
+
+/* Hide less-important columns on medium screens */
+@media (max-width: 960px) {
+  .desktop-only { display: none !important; }
+}
+
+/* Buttons / touch targets */
+button, .MuiButton-root {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+/* Make toolbar inputs full width on small screens */
+@media (max-width: 720px) {
+  .toolbar-stack { display: flex; flex-direction: column; gap: 8px; }
+  .toolbar-stack .btn-inline { width: 100%; display: block; }
+}
+
+/* Accessibility focus */
+:focus {
+  outline: 3px solid rgba(25,118,210,0.18);
+  outline-offset: 2px;
+}
+
+/* Responsive tweaks for tablets and phones
+   - Keep UI structure and spacing but stack side panels, make controls full-width,
+     ensure preview canvases are responsive, increase touch targets, and avoid page overflow.
+   - These selectors intentionally target inline-styled layout pieces used in many pages
+     (e.g. the "absolute" container in SplitMedia) so we don't change JSX.
+*/
+
+@media (max-width: 1024px) {
+  /* Container padding & panel spacing */
+  .container,
+  .MuiContainer-root {
+    padding-left: 12px;
+    padding-right: 12px;
+    max-width: 920px;
+  }
+  .panel {
+    padding: 10px;
+  }
+
+  /* Make fixed-width control columns collapse to full width (SplitMedia left column etc.) */
+  div[style*="flex: 0 0 360px"],
+  div[style*="flex:0 0 360px"],
+  div[style*="width: 360px"],
+  div[style*="width:360px"] {
+    width: 100% !important;
+    flex: 0 0 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Ensure preview area becomes full width under controls */
+  div[style*="flex: 1"][style*="display: \"flex\""],
+  div[style*="flex: 1;"] {
+    width: 100% !important;
+    flex: 1 1 auto !important;
+  }
+
+  /* Convert absolute app container (used in SplitMedia) into normal flow */
+  div[style*="position: absolute"][style*="top"] {
+    position: static !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: auto !important;
+    padding: 12px !important;
+  }
+
+  /* Smaller editor/tool fonts so they fit */
+  .tui-image-editor,
+  .tui-image-editor * {
+    font-size: 14px !important;
+  }
+}
+
+@media (max-width: 720px) {
+  /* base adjustments for phones */
+  html, body, #root {
+    height: auto;
+  }
+  .container,
+  .MuiContainer-root {
+    padding-left: 10px;
+    padding-right: 10px;
+    max-width: 100%;
+  }
+
+  .panel {
+    padding: 8px;
+    border-radius: 6px;
+  }
+
+  /* Stack grids / convert multi-column layouts into single column */
+  .MuiGrid-container,
+  .MuiGrid-root[container],
+  .MuiGrid-root[spacing] {
+    display: block !important;
+  }
+  .MuiGrid-item,
+  .MuiGrid-grid-xs-12,
+  .MuiGrid-grid-sm-6,
+  .MuiGrid-grid-md-4 {
+    width: 100% !important;
+    display: block !important;
+  }
+
+  /* Left control card (360px) -> full width and placed above preview */
+  div[style*="flex: 0 0 360px"],
+  div[style*="width: 360px"],
+  div[style*="flex:0 0 360px"] {
+    width: 100% !important;
+    flex: 0 0 100% !important;
+    max-width: 100% !important;
+    margin-bottom: 12px !important;
+  }
+
+  /* Ensure preview canvas scales nicely on phones */
+  #photo,
+  #photo > canvas,
+  canvas#background {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 60vh !important;
+    display: block !important;
+  }
+
+  /* Convert absolute app container (used in SplitMedia) into normal flow */
+  div[style*="position: absolute"][style*="top"] {
+    position: static !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: auto !important;
+    padding: 12px !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Bigger touch targets for mobile */
+  button,
+  .MuiButton-root,
+  .MuiIconButton-root {
+    min-height: 48px !important;
+    padding: 10px 14px !important;
+    font-size: 14px !important;
+  }
+
+  /* Toolbar inputs and small controls become full width */
+  .toolbar-stack,
+  .toolbar-stack .btn-inline,
+  .MuiInputBase-root,
+  .MuiFormControl-root {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Tabs & lists full width */
+  .MuiTabs-root,
+  .MuiTab-root {
+    width: 100% !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+  }
+
+  /* Hide any oversized left-side hero only for narrow phones (login page left panel already hidden at 960px) */
+  .MuiBox-root[style*="backgroundColor: '#f5f5f5'"] {
+    display: none !important;
+  }
+
+  /* Reduce paddings where necessary */
+  .MuiContainer-root > * {
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+  }
+}
+
+/* Small refinement for very small phones */
+@media (max-width: 420px) {
+  .panel { padding: 6px; }
+  button, .MuiButton-root { font-size: 13px !important; padding: 10px !important; }
+  #photo, canvas#background { max-height: 50vh !important; }
+}
+
+/* End of global.css */
