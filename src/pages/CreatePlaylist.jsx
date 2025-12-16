@@ -5,7 +5,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Formik } from 'formik';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import CardMedia from '@mui/material/CardMedia';
 import { Alert, Stack, Checkbox, Snackbar } from '@mui/material';
 import { Box, Button, Container, TextField, Typography, Grid, MenuItem, Select, FormControl, InputLabel, IconButton, Tooltip } from '@mui/material';
@@ -74,11 +74,37 @@ const CreatePlaylist = (props) => {
   const [box, setbox] = useState(false);
   const [boxMessage, setboxMessage] = useState('');
   const [color, setcolor] = useState('success');
-  const [durationError, setDurationError] = useState(false);
+  // legacy flag removed in favour of a message-driven snackbar so we can show both min/max messages
+  // const [durationError, setDurationError] = useState(false);
+  const [durationSnackbar, setDurationSnackbar] = useState({ open: false, message: '' });
+  // ensure snackbar reliably re-opens every time by toggling closed->open
+  const _snackTimerRef = useRef(null);
+  const showDurationSnackbar = (msg) => {
+    // clear any pending reopen timer
+    if (_snackTimerRef.current) {
+      clearTimeout(_snackTimerRef.current);
+      _snackTimerRef.current = null;
+    }
+    // force-close first so opening same message always retriggers
+    setDurationSnackbar({ open: false, message: '' });
+    // small delay to allow Snackbar to actually close, then open with message
+    _snackTimerRef.current = setTimeout(() => {
+      setDurationSnackbar({ open: true, message: msg });
+      _snackTimerRef.current = null;
+    }, 50);
+  };
+  useEffect(() => {
+    return () => {
+      if (_snackTimerRef.current) {
+        clearTimeout(_snackTimerRef.current);
+        _snackTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const [durationMode, setDurationMode] = useState('Default');
   const [defaultDuration, setDefaultDuration] = useState(10);
-
+  
   const panelBg = 'rgba(25,118,210,0.03)';
   const panelRadius = 8;
   const panelBorder = 'rgba(0,0,0,0.02)';
@@ -243,7 +269,7 @@ const CreatePlaylist = (props) => {
         if (isVideoRef(mediaRef)) return p;
         let next = Number(p.Duration || 10) + delta;
         if (next < 5) {
-          setDurationError(true);
+          showDurationSnackbar('Duration must be at least 5 seconds');
           next = 5;
         }
         if (next > 60) next = 60;
@@ -260,23 +286,15 @@ const CreatePlaylist = (props) => {
       return;
     }
 
+    // allow only digits while typing — do NOT validate/correct here
     const digitsOnly = /^\d+$/.test(value);
     if (!digitsOnly) {
       return;
     }
 
-    const parsed = parseInt(value, 10);
-
-    let next = parsed;
-    if (parsed < 5) {
-      setDurationError(true);
-      next = 5;
-    }
-
-    if (next > 60) next = 60;
-
+    // store raw typed value (string) so user can finish typing
     setplaylistMedia((prev) =>
-      prev.map((p) => (p.MediaRef === mediaRef ? { ...p, Duration: next } : p))
+      prev.map((p) => (p.MediaRef === mediaRef ? { ...p, Duration: value } : p))
     );
   }
 
@@ -287,10 +305,12 @@ const CreatePlaylist = (props) => {
         if (isVideoRef(mediaRef)) return p;
         let value = Number(p.Duration);
         if (isNaN(value) || value < 5) {
-          setDurationError(true);
+          showDurationSnackbar('Duration must be at least 5 seconds');
           value = 5;
+        } else if (value > 60) {
+          showDurationSnackbar('Duration cannot exceed 60 seconds');
+          value = 60;
         }
-        if (value > 60) value = 60;
         return { ...p, Duration: value };
       })
     );
@@ -309,7 +329,45 @@ const CreatePlaylist = (props) => {
       window.scrollTo(0, 0);
       return;
     }
-    const sanitizedPlaylist = playlistMedia.map((p) => {
+
+    // Validate durations once at save time (and show the same error popup if corrections made)
+    let anyCorrections = false;
+    let anyMinCorrection = false;
+    let anyMaxCorrection = false;
+    const validatedMedia = playlistMedia.map((p) => {
+      if (isVideoRef(p.MediaRef)) return p;
+      const raw = p.Duration;
+      if (raw === '' || raw === null || raw === undefined) return p;
+      const n = Number(raw);
+      if (Number.isNaN(n)) {
+        anyCorrections = true;
+        return { ...p, Duration: 10 };
+      }
+      if (n < 5) {
+        anyCorrections = true;
+        anyMinCorrection = true;
+        return { ...p, Duration: 5 };
+      }
+      if (n > 60) {
+        anyCorrections = true;
+        anyMaxCorrection = true;
+        return { ...p, Duration: 60 };
+      }
+      return { ...p, Duration: n };
+    });
+
+    if (anyCorrections) {
+      if (anyMinCorrection && !anyMaxCorrection) {
+        showDurationSnackbar('Duration must be at least 5 seconds');
+      } else if (anyMaxCorrection && !anyMinCorrection) {
+        showDurationSnackbar('Duration cannot exceed 60 seconds');
+      } else {
+        // mixed corrections - show a neutral informative message
+        showDurationSnackbar('Some durations were corrected to valid range');
+      }
+    }
+
+    const sanitizedPlaylist = validatedMedia.map((p) => {
       const isVideo = isVideoRef(p.MediaRef);
       let dur = p.Duration;
       if (isVideo) dur = null;
@@ -337,7 +395,6 @@ const CreatePlaylist = (props) => {
         setboxMessage(err.errmessage || 'Error saving playlist');
         setbox(true);
       } else {
-        // Show different flash message for Edit vs Create
         const successMessage = (type === 'Edit' || id !== '') ? 'Playlist Edited Successfully' : 'Playlist Created Successfully';
         navigate('/app/playlists', { replace: true, state: { flashMessage: successMessage } });
       }
@@ -398,13 +455,13 @@ const CreatePlaylist = (props) => {
       )}
 
       <Snackbar
-        open={durationError}
-        autoHideDuration={2000}
-        onClose={() => setDurationError(false)}
+        open={durationSnackbar.open}
+        autoHideDuration={5000} 
+        onClose={() => setDurationSnackbar({ open: false, message: '' })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={() => setDurationError(false)} severity="warning" sx={{ width: '100%' }}>
-          Duration must be at least 5 seconds
+        <Alert onClose={() => setDurationSnackbar({ open: false, message: '' })} severity="warning" sx={{ width: '100%' }}>
+          {durationSnackbar.message}
         </Alert>
       </Snackbar>
 
