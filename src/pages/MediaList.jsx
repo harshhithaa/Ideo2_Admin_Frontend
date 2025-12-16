@@ -19,9 +19,11 @@ import {
   Tabs,
   Tab,
   SvgIcon,
-  Tooltip
+  Tooltip,
+  IconButton
 } from '@mui/material';
 import { Search as SearchIcon, Trash2 as Trash2Icon } from 'react-feather';
+import CloseIcon from '@mui/icons-material/Close';
 import { connect } from 'react-redux';
 import { COMPONENTS } from 'src/utils/constant.jsx';
 import {
@@ -78,6 +80,12 @@ const MediaList = (props) => {
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [prevActiveTab, setPrevActiveTab] = useState(null);
 
+  // Viewer state for full-size media
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerItem, setViewerItem] = useState(null);
+  const openViewer = (item) => { setViewerItem(item); setViewerOpen(true); };
+  const closeViewer = () => { setViewerOpen(false); setViewerItem(null); };
+  
   const [imagePage, setImagePage] = useState(1);
   const [videoPage, setVideoPage] = useState(1);
   const [gifPage, setGifPage] = useState(1);
@@ -739,61 +747,116 @@ const MediaList = (props) => {
           checked={selected.indexOf(item.MediaRef) !== -1}
           onClick={(e) => e.stopPropagation()}
           onChange={() => toggleSelection(item.MediaRef)}
+          sx={{
+            width: 22,
+            height: 22,
+            borderRadius: '4px', // <-- square
+            background: 'rgba(0,0,0,0.10)',
+            color: '#fff',
+            '&.Mui-checked': { color: '#fff' },
+            '& .MuiSvgIcon-root': { fontSize: 18 }, // make checkmark smaller
+            '&:hover': { background: 'rgba(0,0,0,0.15)' }
+          }}
         />
 
-        <div style={{ width: '100%', paddingTop: '100%', position: 'relative', background: '#f4f4f4' }}>
-          {isProcessing ? (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <div style={{ width: '80%' }}>
-                <div style={{ background: '#e0e0e0', height: 6, borderRadius: 3 }} />
-              </div>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>Processing...</Typography>
-            </div>
-          ) : (
-            isVideo ? (
-              thumb ? (
-                <img
-                  src={thumb}
-                  alt={item.MediaName || item.MediaRef}
-                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                  onError={imgOnError}
-                />
-              ) : src ? (
-                <video
-                  src={src}
-                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#000' }}
-                  preload="metadata"
-                  muted
-                  playsInline
-                />
-              ) : (
-                <div style={{ position: 'absolute', inset: 0 }}>
-                  <div style={{ display:'flex',alignItems:'center',justifyContent:'center',background:'#f4f4f4',color:'#999',width:'100%',height:'100%'}}>No media</div>
-                </div>
-              )
-            ) : (
-              src ? (
-                <img
-                  src={src}
-                  alt={item.MediaName || item.MediaRef}
-                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                  onError={imgOnError}
-                />
-              ) : (
-                <div style={{ position: 'absolute', inset: 0 }}>
-                  <div style={{ display:'flex',alignItems:'center',justifyContent:'center',background:'#f4f4f4',color:'#999',width:'100%',height:'100%'}}>No media</div>
-                </div>
-              )
-            )
-          )}
-        </div>
+        {/* Clicking content opens viewer; stopPropagation avoids toggling selection */}
+        <div
+          style={{ width: '100%', paddingTop: '100%', position: 'relative', background: '#f4f4f4' }}
+          onClick={(e) => { e.stopPropagation(); openViewer(item); }}
+        >
+           {isProcessing ? (
+             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+               <div style={{ width: '80%' }}>
+                 <div style={{ background: '#e0e0e0', height: 6, borderRadius: 3 }} />
+               </div>
+               <Typography variant="caption" sx={{ color: 'text.secondary' }}>Processing...</Typography>
+             </div>
+           ) : (
+             isVideo ? (
+               thumb ? (
+                 <img
+                   src={thumb}
+                   alt={item.MediaName || item.MediaRef}
+                   style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                   onError={imgOnError}
+                 />
+               ) : src ? (
+                 <video
+                   src={src}
+                   style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#000' }}
+                   preload="metadata"
+                   muted
+                   playsInline
+                 />
+               ) : (
+                 <div style={{ position: 'absolute', inset: 0 }}>
+                   <div style={{ display:'flex',alignItems:'center',justifyContent:'center',background:'#f4f4f4',color:'#999',width:'100%',height:'100%'}}>No media</div>
+                 </div>
+               )
+             ) : (
+               src ? (
+                 <img
+                   src={src}
+                   alt={item.MediaName || item.MediaRef}
+                   style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                   onError={imgOnError}
+                 />
+               ) : (
+                 <div style={{ position: 'absolute', inset: 0 }}>
+                   <div style={{ display:'flex',alignItems:'center',justifyContent:'center',background:'#f4f4f4',color:'#999',width:'100%',height:'100%'}}>No media</div>
+                 </div>
+               )
+             )
+           )}
+         </div>
 
-        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '8px', background: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: 13 }}>
-          {item.MediaName}
-        </div>
-      </div>
-    );
-  };
+         <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '8px', background: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: 13 }}>
+           {item.MediaName}
+         </div>
+       </div>
+     );
+   };
+
+   // Viewer modal UI and renderer
+   const viewerStyle = {
+     position: 'absolute',
+     top: '50%',
+     left: '50%',
+     transform: 'translate(-50%, -50%)',
+     width: 600,
+     maxWidth: '95vw',
+     height: 400,
+     maxHeight: '80vh',
+     outline: 'none',
+     bgcolor: 'transparent',
+     display: 'flex',
+     alignItems: 'center',
+     justifyContent: 'center'
+   };
+
+   const renderViewerContent = () => {
+     if (!viewerItem) return null;
+     const src = buildSrc(viewerItem?.MediaPath);
+     const thumb = buildSrc(viewerItem?.Thumbnail || viewerItem?.MediaThumb || viewerItem?.Poster);
+     const rawType = (viewerItem?.MediaType || '').toString().toLowerCase();
+     const isVideo = rawType.includes('video') || (viewerItem?.MediaName || '').toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
+     if (isVideo) {
+       return (
+         <video
+           src={src || thumb}
+           controls
+           style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 4, background: '#000' }}
+         />
+       );
+     }
+     return (
+       <img
+         src={src || thumb}
+         alt={viewerItem.MediaName}
+         style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 4, background: '#000' }}
+       />
+     );
+   };
 
   const handlePageChange = (event, value) => {
     setCurrentPage(value);
@@ -889,6 +952,41 @@ const MediaList = (props) => {
 
   return (
     <>
+      <Modal open={viewerOpen} onClose={() => closeViewer()}>
+        <Box sx={viewerStyle}>
+          <Box sx={{
+            position: 'relative',
+            bgcolor: '#fff', // White background
+            p: 1,
+            borderRadius: 2,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '2px solid #e0e0e0', // Light border
+            boxShadow: 6 // Subtle shadow
+          }}>
+            <IconButton
+              size="small"
+              onClick={() => closeViewer()}
+              sx={{ position: 'absolute', right: 6, top: 6, zIndex: 10, color: '#333' }}
+            >
+              <CloseIcon />
+            </IconButton>
+            <Box sx={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              {renderViewerContent()}
+            </Box>
+          </Box>
+        </Box>
+      </Modal>
+
       <Helmet><title>Media | Ideogram</title></Helmet>
 
       {box && (
@@ -1044,27 +1142,34 @@ const MediaList = (props) => {
             <Box sx={{ width: '100%', maxWidth: 1400, bgcolor: 'transparent' }}>
               <Box sx={{ borderBottom: 'none', px: 2, pt: 3, display: 'flex', justifyContent: 'center' }}>
                 <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%' }}>
+                  {/* Move Select All to the left */}
+                  {hasSelection && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+                      <Checkbox
+                        size="small"
+                        checked={allVisibleSelected}
+                        indeterminate={someVisibleSelected}
+                        onChange={handleSelectAllVisible}
+                        sx={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: '4px', // <-- square
+                          background: 'rgba(0,0,0,0.10)',
+                          color: '#fff',
+                          '&.Mui-checked': { color: '#fff' },
+                          '& .MuiSvgIcon-root': { fontSize: 18 },
+                          '&:hover': { background: 'rgba(0,0,0,0.15)' }
+                        }}
+                      />
+                      <Typography variant="body2">Select all</Typography>
+                    </Box>
+                  )}
                   <Box sx={{ margin: '0 auto' }}>
                     <Tabs value={activeTab} onChange={handleTabChange}>
                       <Tab disableRipple label={tabLabel('IMAGES', imageTotalRecords)} value="IMAGES" />
                       <Tab disableRipple label={tabLabel('VIDEOS', videoTotalRecords)} value="VIDEOS" />
                       <Tab disableRipple label={tabLabel('GIFS', gifTotalRecords)} value="GIFS" />
                     </Tabs>
-                  </Box>
-
-                  <Box sx={{ position: 'absolute', right: 8 }}>
-                    {hasSelection && (
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Checkbox
-                          size="small"
-                          checked={allVisibleSelected}
-                          indeterminate={someVisibleSelected}
-                          onChange={handleSelectAllVisible}
-                          sx={{ p: 0, mr: 0.5 }}
-                        />
-                        <Typography variant="body2">Select all</Typography>
-                      </Box>
-                    )}
                   </Box>
                 </Box>
               </Box>

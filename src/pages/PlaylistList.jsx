@@ -1,7 +1,9 @@
 /* eslint-disable linebreak-style */
 /* eslint-disable react/prop-types */
 /* eslint-disable linebreak-style */
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Snackbar, Alert } from '@mui/material';
 import { Helmet } from 'react-helmet-async';
 
 import { Box, Button, Container, Modal, Grid } from '@mui/material';
@@ -16,12 +18,11 @@ import {
   validateDeleteComponentList,
   deleteComponentList
 } from '../store/action/user';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Alert, Stack } from '@mui/material';
 
 const PlaylistList = (props) => {
   const { component } = props || null;
   const location = useLocation();
+  const navigate = useNavigate();
   const [playlists, setplaylists] = useState([]);
   const [loader, setloader] = useState(false);
   const [selected, setselected] = useState([]);
@@ -33,14 +34,20 @@ const PlaylistList = (props) => {
   const [boxMessage, setboxMessage] = useState('');
   const [color, setcolor] = useState('success');
 
+  // Flash message state (show only once when redirected from Create/Edit)
+  const [flashOpen, setFlashOpen] = useState(false);
+  const [flashMessage, setFlashMessage] = useState('');
+
   // Show flash message when navigated here after creating a playlist
   useEffect(() => {
-    if (location && location.state && location.state.flashMessage) {
-      setcolor('success');
-      setboxMessage(location.state.flashMessage);
-      setbox(true);
+    const msg = location?.state?.flashMessage;
+    if (msg) {
+      setFlashMessage(msg);
+      setFlashOpen(true);
+      // clear the navigation state so the flash doesn't reappear on reload/navigation
+      navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location]);
+  }, [location, navigate]);
 
   // Auto-dismiss the top-center popup after 2 seconds
   useEffect(() => {
@@ -50,7 +57,6 @@ const PlaylistList = (props) => {
   }, [box]);
   
   console.log('props', selected);
-  let navigate = useNavigate();
   useEffect(() => {
     const data = {
       componenttype: COMPONENTS.Playlist
@@ -121,6 +127,16 @@ const PlaylistList = (props) => {
       <Helmet>
         <title>Playlists | Ideogram</title>
       </Helmet>
+      <Snackbar
+        open={flashOpen}
+        autoHideDuration={5000}
+        onClose={() => setFlashOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setFlashOpen(false)} severity="success" sx={{ width: '100%' }}>
+          {flashMessage}
+        </Alert>
+      </Snackbar>
       {box ? (
         <Stack sx={{ width: '100%' }} spacing={2}>
           <Alert severity={color}>{boxMessage}</Alert>

@@ -8,7 +8,7 @@ import { Formik } from 'formik';
 import React, { useState, useEffect, useRef } from 'react';
 import CardMedia from '@mui/material/CardMedia';
 import { Alert, Stack, Checkbox, Snackbar } from '@mui/material';
-import { Box, Button, Container, TextField, Typography, Grid, MenuItem, Select, FormControl, InputLabel, IconButton, Tooltip } from '@mui/material';
+import { Box, Button, Container, TextField, Typography, Grid, MenuItem, Select, FormControl, InputLabel, IconButton, Tooltip, InputAdornment } from '@mui/material';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -39,6 +39,8 @@ const VideoThumbnail = ({ videoUrl, alt }) => {
     </Box>
   );
 };
+
+const DESCRIPTION_MAX_LENGTH = 45;
 
 const CreatePlaylist = (props) => {
   const navigate = useNavigate();
@@ -104,6 +106,7 @@ const CreatePlaylist = (props) => {
 
   const [durationMode, setDurationMode] = useState('Default');
   const [defaultDuration, setDefaultDuration] = useState(10);
+  const [durationsValid, setDurationsValid] = useState(false);
   
   const panelBg = 'rgba(25,118,210,0.03)';
   const panelRadius = 8;
@@ -175,21 +178,22 @@ const CreatePlaylist = (props) => {
   }, [currentPage, pageSize, searchQuery]);
 
   const isVideoRef = (mediaRef) => {
-    // Check global metadata first
-    if (globalMediaMetadata[mediaRef]) {
-      const mm = globalMediaMetadata[mediaRef].MediaType.toLowerCase();
+    // Safe checks against stored metadata first (guard against missing fields)
+    const meta = globalMediaMetadata[mediaRef];
+    if (meta && meta.MediaType) {
+      const mm = String(meta.MediaType).toLowerCase();
       if (mm.includes('video')) return true;
       if (mm.includes('image')) return false;
     }
 
-    // Fallback to current mediaData
+    // Fallback to current mediaData with robust string coercion
     const item = mediaData.find((m) => m.MediaRef === mediaRef);
     if (!item) return false;
-    const mm = (item.fileMimetype || item.FileMimetype || item.FileType || item.MediaType || '').toString().toLowerCase();
-    if (mm.includes('video')) return true;
-    if (mm.includes('image')) return false;
-    const url = (item.fileUrl || item.FileUrl || item.FileURL || '').toString().toLowerCase();
-    if (url.match(/\.(mp4|mov|webm|mkv)$/)) return true;
+    const mm2 = String(item.fileMimetype || item.FileMimetype || item.FileType || item.MediaType || '').toLowerCase();
+    if (mm2.includes('video')) return true;
+    if (mm2.includes('image')) return false;
+    const url = String(item.fileUrl || item.FileUrl || item.FileURL || '').toLowerCase();
+    if (/\.(mp4|mov|webm|mkv)$/.test(url)) return true;
     return false;
   };
 
@@ -267,12 +271,18 @@ const CreatePlaylist = (props) => {
       prev.map((p) => {
         if (p.MediaRef !== mediaRef) return p;
         if (isVideoRef(mediaRef)) return p;
-        let next = Number(p.Duration || 10) + delta;
+        let current = Number(p.Duration || 10);
+        let next = current + delta;
+
         if (next < 5) {
           showDurationSnackbar('Duration must be at least 5 seconds');
           next = 5;
+        } else if (next > 60) {
+          // show popup when attempting to go above 60 (including clicking + at 60)
+          showDurationSnackbar('Duration cannot exceed 60 seconds');
+          next = 60;
         }
-        if (next > 60) next = 60;
+
         return { ...p, Duration: next };
       })
     );
@@ -321,12 +331,37 @@ const CreatePlaylist = (props) => {
     setplaylistMedia((prev) => prev.map((p) => (isVideoRef(p.MediaRef) ? { ...p, Duration: null } : { ...p, Duration: Number(defaultDuration) })));
   }, [defaultDuration, durationMode]);
 
+  // validate all non-video durations are numeric and within 5..60
+  const checkAllDurationsValid = (list) => {
+    if (!Array.isArray(list) || list.length === 0) return false;
+    for (const p of list) {
+      if (isVideoRef(p.MediaRef)) continue;
+      const val = p.Duration;
+      if (val === '' || val === null || val === undefined) return false;
+      const n = Number(val);
+      if (Number.isNaN(n) || n < 5 || n > 60) return false;
+    }
+    return true;
+  };
+
+  useEffect(() => {
+    setDurationsValid(checkAllDurationsValid(playlistMedia));
+  }, [playlistMedia, durationMode, defaultDuration]);
+
   function savePlaylistDetails() {
     if (!title || title.toString().trim() === '') {
       setcolor('error');
       setboxMessage('Title is required');
       setbox(true);
       window.scrollTo(0, 0);
+      return;
+    }
+
+    // enforce DB-sized description limit on frontend
+    if (description && description.length > DESCRIPTION_MAX_LENGTH) {
+      setbox(true);
+      setcolor('error');
+      setboxMessage(`Description cannot exceed ${DESCRIPTION_MAX_LENGTH} characters.`);
       return;
     }
 
@@ -381,6 +416,8 @@ const CreatePlaylist = (props) => {
     const savePlaylistData = {
       playlistName: title,
       description: description,
+      durationMode: durationMode,  // ✅ Save duration mode
+      defaultDuration: durationMode === 'Default' ? defaultDuration : null,  // ✅ Save default duration
       playlist: [
         ...sanitizedPlaylist,
         ...deletedplaylistMedia.map((p) => ({ MediaRef: p.MediaRef, IsActive: p.IsActive, Duration: p.Duration || null }))
@@ -428,6 +465,28 @@ const CreatePlaylist = (props) => {
       setdeletedplaylistMedia(initialSelections.filter(sel => sel.IsActive === 0));
       setSelectedRefs(initialSelections.filter(sel => sel.IsActive === 1).map(sel => sel.MediaRef));
       setSelectionCounter(initialSelections.length + 1);
+
+      // ✅ AUTO-DETECT DURATION MODE FROM EXISTING DURATIONS
+      const activeImages = initialSelections.filter(sel => 
+        sel.IsActive === 1 && 
+        sel.MediaType && 
+        !sel.MediaType.toLowerCase().includes('video')
+      );
+      
+      if (activeImages.length > 0) {
+        // Get all unique durations
+        const durations = activeImages.map(img => Number(img.Duration)).filter(d => d > 0);
+        const uniqueDurations = [...new Set(durations)];
+        
+        // If all images have the same duration, it's Default mode
+        if (uniqueDurations.length === 1) {
+          setDurationMode('Default');
+          setDefaultDuration(uniqueDurations[0]);
+        } else {
+          // If images have different durations, it's Custom mode
+          setDurationMode('Custom');
+        }
+      }
 
       // Update global metadata
       const metadataMap = {};
@@ -538,16 +597,25 @@ const CreatePlaylist = (props) => {
                         <TextField
                           error={Boolean(touched.description && errors.description)}
                           fullWidth
-                          helperText={touched.description && errors.description}
                           label="Description"
                           margin="dense"
                           name="description"
                           onBlur={handleBlur}
-                          onChange={(e) => setDescription(e.target.value)}
+                          onChange={(e) => setDescription((e.target.value || '').slice(0, DESCRIPTION_MAX_LENGTH))}
                           value={description}
                           variant="outlined"
                           disabled={isViewMode}
                           InputLabelProps={{ sx: { color: 'text.primary', fontWeight: 550, fontSize: '1rem' } }}
+                          inputProps={{ maxLength: DESCRIPTION_MAX_LENGTH }}
+                          InputProps={{
+                            endAdornment: (
+                              <InputAdornment position="end" sx={{ mr: 1, pointerEvents: 'none' }}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                  {description.length}/{DESCRIPTION_MAX_LENGTH}
+                                </Typography>
+                              </InputAdornment>
+                            )
+                          }}
                           sx={{ '& .MuiInputBase-input': { color: 'text.primary', fontSize: '1rem', lineHeight: 1.2 }, mt: 0.5 }}
                         />
                       </Grid>
@@ -783,7 +851,11 @@ const CreatePlaylist = (props) => {
                         type="button"
                         variant="contained"
                         onClick={() => savePlaylistDetails()}
-                        disabled={!title || title.toString().trim() === ''}
+                        // When Default mode, button should always be enabled (only title required).
+                        // When Custom mode, require durationsValid as before.
+                        disabled={
+                          !title || title.toString().trim() === '' || (durationMode === 'Custom' && !durationsValid)
+                        }
                       >
                         {type} Playlist
                       </Button>

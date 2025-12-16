@@ -29,7 +29,8 @@ import {
   Alert,
   Modal,
   SvgIcon,
-  useTheme
+  useTheme,
+  InputAdornment
 } from '@mui/material';
 import { saveSchedule, getUserComponentList } from '../store/action/user';
 import { COMPONENTS } from 'src/utils/constant.jsx';
@@ -64,6 +65,9 @@ const DAY_CODE_TO_NAME_DISPLAY = {
   '5': 'Friday',
   '6': 'Saturday'
 };
+
+// Description max length mirrors DB varchar(45)
+const DESCRIPTION_MAX_LENGTH = 45;
 
 const SaveScheduleDetails = (props) => {
   const navigate = useNavigate();
@@ -707,11 +711,21 @@ const normalizeDaysToCodes = (daysInput) => {
                 <TextField
                   label="Description"
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(e) => setDescription((e.target.value || '').slice(0, DESCRIPTION_MAX_LENGTH))}
                   fullWidth
                   required
                   size="medium"
                   InputLabelProps={{ sx: labelSx }}
+                  inputProps={{ maxLength: DESCRIPTION_MAX_LENGTH }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end" sx={{ pointerEvents: 'none' }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                          {description.length}/{DESCRIPTION_MAX_LENGTH}
+                        </Typography>
+                      </InputAdornment>
+                    )
+                  }}
                 />
               </Grid>
 
