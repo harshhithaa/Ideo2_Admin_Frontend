@@ -173,7 +173,6 @@ const MonitorListResults = (props) => {
       return (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <CircularProgress size={20} />
-          <Typography variant="caption">Checking...</Typography>
         </Box>
       );
     }
@@ -182,11 +181,13 @@ const MonitorListResults = (props) => {
       return (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Chip 
-            label="Unknown" 
+            label="Unknown"
             size="small"
             sx={{ 
-              bgcolor: '#e0e0e0',
-              color: '#666'
+              bgcolor: '#f5f5f5',
+              color: '#999',
+              fontWeight: 600,
+              minWidth: '80px'
             }}
           />
           <IconButton 
@@ -207,30 +208,30 @@ const MonitorListResults = (props) => {
 
     if (status.error) {
       return (
-        <Tooltip title={status.error} arrow>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Chip 
-              label="Offline" 
-              size="small"
-              sx={{ 
-                bgcolor: '#ffebee',
-                color: '#c62828'
-              }}
-            />
-            <IconButton 
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRefreshStatus(monitor.MonitorRef);
-              }}
-              sx={{ padding: '4px' }}
-            >
-              <SvgIcon fontSize="small">
-                <RefreshIcon />
-              </SvgIcon>
-            </IconButton>
-          </Box>
-        </Tooltip>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Chip 
+            label="Error"
+            size="small"
+            sx={{ 
+              bgcolor: '#ffebee',
+              color: '#c62828',
+              fontWeight: 600,
+              minWidth: '80px'
+            }}
+          />
+          <IconButton 
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRefreshStatus(monitor.MonitorRef);
+            }}
+            sx={{ padding: '4px' }}
+          >
+            <SvgIcon fontSize="small">
+              <RefreshIcon />
+            </SvgIcon>
+          </IconButton>
+        </Box>
       );
     }
 
@@ -239,88 +240,75 @@ const MonitorListResults = (props) => {
 
     if (!isOnline) {
       return (
-        <Tooltip title={`Last seen: ${formatLastSeen(status.LastUpdate)}`} arrow>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Chip 
-              label="Offline" 
-              size="small"
-              sx={{ 
-                bgcolor: '#ffebee',
-                color: '#c62828'
-              }}
-            />
-            <IconButton 
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRefreshStatus(monitor.MonitorRef);
-              }}
-              sx={{ padding: '4px' }}
-            >
-              <SvgIcon fontSize="small">
-                <RefreshIcon />
-              </SvgIcon>
-            </IconButton>
-          </Box>
-        </Tooltip>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Chip 
+            label="Offline"
+            size="small"
+            sx={{ 
+              bgcolor: '#ffebee',
+              color: '#c62828',
+              fontWeight: 600,
+              minWidth: '80px'
+            }}
+          />
+          <IconButton 
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRefreshStatus(monitor.MonitorRef);
+            }}
+            sx={{ padding: '4px' }}
+          >
+            <SvgIcon fontSize="small">
+              <RefreshIcon />
+            </SvgIcon>
+          </IconButton>
+        </Box>
       );
     }
 
-    // Determine display name for the playlist
-    const playlistName = (() => {
-      // 1) If status reports a specific playlist (not the generic "Default"), use it.
-      if (status && status.CurrentPlaylist && String(status.CurrentPlaylist).toLowerCase() !== 'default') {
-        return status.CurrentPlaylist;
-      }
+    // Get playlist name - this ONLY affects display, not schedule execution
+    const playlistName = status.CurrentPlaylist || status.currentPlaylist || 'Unknown';
+    const playlistType = status.PlaylistType || status.playlistType || 'Default';
+    const currentMedia = status.CurrentMedia || status.currentMedia;
+    const mediaIndex = status.MediaIndex ?? status.mediaIndex;
+    const totalMedia = status.TotalMedia ?? status.totalMedia;
+    const healthStatus = status.HealthStatus || status.healthStatus;
+    const screenState = status.ScreenState || status.screenState;
+    const isProgressing = status.IsProgressing ?? status.isProgressing;
+    const errors = status.Errors || status.errors;
+    const isCachedPlaylist = status.IsCachedPlaylist ?? status.isCachedPlaylist;
+    const cacheAge = status.CacheAge ?? status.cacheAge;
 
-      // 2) If CurrentMedia is present, try to find the playlist that contains that media.
-      if (status && status.CurrentMedia) {
-        const pl = findPlaylistContainingMedia(status.CurrentMedia);
-        if (pl) {
-          return pl.Name || pl.PlaylistName || pl.Title || pl.DefaultPlaylistName || 'Playlist';
-        }
-      }
-
-      // 3) Fallback to monitor's DefaultPlaylistName (what's shown in the Default Playlist column).
-      if (monitor && monitor.DefaultPlaylistName) {
-        return monitor.DefaultPlaylistName;
-      }
-
-      // 4) Final fallbacks
-      return status.CurrentPlaylist || 'Active';
-    })();
-
-    // Determine if monitor has health issues
     const hasHealthIssues = 
-      status.healthStatus === 'warning' || 
-      status.healthStatus === 'error' ||
-      (status.screenState && status.screenState !== 'active') ||
-      (status.errors && status.errors.length > 0) ||
-      status.isProgressing === false;
+      healthStatus === 'warning' || 
+      healthStatus === 'error' ||
+      (screenState && screenState !== 'active') ||
+      (errors && errors.length > 0) ||
+      isProgressing === false;
 
     const tooltipContent = (
       <Box sx={{ p: 0.5 }}>
         <Typography variant="caption" sx={{ display: 'block', fontWeight: 600 }}>
-          Current Playlist: {playlistName || 'N/A'}
+          Current Playlist: {playlistName}
         </Typography>
         <Typography variant="caption" sx={{ display: 'block' }}>
-          Type: {status.PlaylistType || 'N/A'}
+          Type: {playlistType}
         </Typography>
-        {status.CurrentMedia && (
+        {currentMedia && (
           <Typography variant="caption" sx={{ display: 'block' }}>
-            Media: {status.CurrentMedia}
+            Media: {currentMedia}
           </Typography>
         )}
-        {status.MediaIndex !== undefined && status.TotalMedia !== undefined && (
+        {mediaIndex !== undefined && totalMedia !== undefined && (
           <Typography variant="caption" sx={{ display: 'block' }}>
-            Progress: {status.MediaIndex + 1}/{status.TotalMedia}
+            Progress: {mediaIndex + 1}/{totalMedia}
           </Typography>
         )}
-        {/* ✅ Show cache status */}
-        {status.isCachedPlaylist && (
+        {isCachedPlaylist && (
           <Typography variant="caption" sx={{ display: 'block', color: '#ff9800', fontWeight: 600, mt: 0.5 }}>
             ⚠️ Using Cached Playlist
-            {status.cacheAge !== null && ` (${status.cacheAge} days old)`}
+            {cacheAge !== null && ` (${cacheAge} days old)`}
           </Typography>
         )}
         <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem' }}>
@@ -330,28 +318,27 @@ const MonitorListResults = (props) => {
           ({status.SecondsSinceUpdate}s ago)
         </Typography>
         
-        {/* Health status information */}
-        {status.healthStatus && (
+        {healthStatus && (
           <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-            Health: {status.healthStatus}
+            Health: {healthStatus}
           </Typography>
         )}
-        {status.screenState && status.screenState !== 'active' && (
+        {screenState && screenState !== 'active' && (
           <Typography variant="caption" sx={{ display: 'block', color: '#ff9800' }}>
-            Screen State: {status.screenState}
+            Screen State: {screenState}
           </Typography>
         )}
-        {status.isProgressing === false && (
+        {isProgressing === false && (
           <Typography variant="caption" sx={{ display: 'block', color: '#ff9800' }}>
             ⚠️ Media playback not progressing
           </Typography>
         )}
-        {status.errors && status.errors.length > 0 && (
+        {errors && errors.length > 0 && (
           <Box sx={{ mt: 0.5 }}>
             <Typography variant="caption" sx={{ display: 'block', fontWeight: 600, color: '#f44336' }}>
-              {status.errors.some(e => e.severity === 'error') ? 'Errors:' : 'Warnings:'}
+              {errors.some(e => e.severity === 'error') ? 'Errors:' : 'Warnings:'}
             </Typography>
-            {status.errors.map((error, idx) => (
+            {errors.map((error, idx) => (
               <Typography key={idx} variant="caption" sx={{ 
                 display: 'block', 
                 fontSize: '0.7rem', 
@@ -365,7 +352,6 @@ const MonitorListResults = (props) => {
       </Box>
     );
 
-    // Online status - show playlist name with health-aware coloring
     return (
       <Tooltip title={tooltipContent} arrow placement="left">
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
