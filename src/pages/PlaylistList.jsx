@@ -49,7 +49,6 @@ const PlaylistList = (props) => {
     }
   }, [location, navigate]);
 
-  // Auto-dismiss the top-center popup after 2 seconds
   useEffect(() => {
     if (!box) return undefined;
     const t = setTimeout(() => setbox(false), 2000);
@@ -71,7 +70,6 @@ const PlaylistList = (props) => {
     });
   }, [loader]);
   const style = {
-    // show popup at top center
     position: 'fixed',
     top: 16,
     left: '50%',
