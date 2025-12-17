@@ -231,20 +231,20 @@ const EditImage = ({ saveMedia: uploadMedia }) => {
     
     // ✅ Custom handler function - extracted outside
     const setupCustomLayerHandler = (fileInput) => {
-      console.log('Setting up custom layer handler');
+      if (!fileInput) return;
+      // avoid double-attaching
+      if (fileInput._customLayerHandler) return;
+      console.log('Setting up custom layer handler (addEventListener)');
       const originalOnChange = fileInput.onchange;
       
-      fileInput.onchange = function(e) {
-        e.stopPropagation();
-        e.preventDefault();
-        
+      const handler = function(e) {
+        // do not prevent default here — allow native change lifecycle
         if (e.target.files && e.target.files[0]) {
           const file = e.target.files[0];
           const reader = new FileReader();
           
           reader.onload = function(event) {
             const imageUrl = event.target.result;
-            
             // If background exists, add new image as a layer
             if (backgroundLayer && editorInstance.current) {
               const tempImg = new Image();
@@ -300,6 +300,9 @@ const EditImage = ({ saveMedia: uploadMedia }) => {
                 editorInstance.current.loadImageFromFile(file).then(() => {
                   setBackgroundLayer(imageUrl);
                   console.log('Image loaded as background');
+                }).catch(err => {
+                  console.error('loadImageFromFile failed', err);
+                  if (originalOnChange) originalOnChange.call(fileInput, e);
                 });
               }
             }
@@ -310,9 +313,12 @@ const EditImage = ({ saveMedia: uploadMedia }) => {
           
           reader.readAsDataURL(file);
         }
-        
-        return false;
       };
+      
+      fileInput.addEventListener('change', handler);
+      // mark so we don't reattach
+      fileInput._customLayerHandler = handler;
+      fileInputRef.current = fileInput;
     };
 
     // Cleanup on unmount
@@ -328,6 +334,14 @@ const EditImage = ({ saveMedia: uploadMedia }) => {
         } catch (e) {}
         resizeObserverRef.current = null;
       }
+      // remove file input custom handler if attached
+      if (fileInputRef.current && fileInputRef.current._customLayerHandler) {
+        try {
+          fileInputRef.current.removeEventListener('change', fileInputRef.current._customLayerHandler);
+        } catch (e) {}
+        delete fileInputRef.current._customLayerHandler;
+        fileInputRef.current = null;
+      }
     };
   }, [location.state, backgroundLayer]);
 
@@ -339,6 +353,35 @@ const EditImage = ({ saveMedia: uploadMedia }) => {
     }
   };
 
+  // Open the editor's hidden file input (or fallback to the editor's Load button)
+  const handleLoadMedia = () => {
+    try {
+      // prefer stored ref (set when custom handler attached), then try broad selector
+      const fileInput = fileInputRef.current || document.querySelector('.tui-image-editor-wrap input[type="file"], input[type="file"]');
+      if (fileInput) {
+        fileInput.click();
+        return;
+      }
+      const loadBtn = document.querySelector('.tui-image-editor-load-btn');
+      if (loadBtn) {
+        loadBtn.click();
+        return;
+      }
+      // As a last resort create a native file input to allow user to pick a file
+      const tmp = document.createElement('input');
+      tmp.type = 'file';
+      tmp.accept = 'image/*';
+      tmp.style.display = 'none';
+      document.body.appendChild(tmp);
+      tmp.click();
+      // remove after use
+      tmp.addEventListener('change', () => {
+        setTimeout(() => tmp.remove(), 300);
+      });
+    } catch (err) {
+      console.warn('Failed to open file picker', err);
+    }
+  };
   const handleClose = () => {
     if (editorInstance.current) {
       editorInstance.current.destroy();
@@ -496,21 +539,26 @@ const EditImage = ({ saveMedia: uploadMedia }) => {
          }}
        >
         {/* Download button */}
-        <Button 
-          color="primary" 
-          variant="contained" 
-          onClick={handleSave}
-          aria-label="Download"
-          sx={{ 
-            position: 'absolute',
-            bottom: 35,
-            right: 50,
-            zIndex: 20,
-            textTransform: 'none'
-          }}
-        >
-          DOWNLOAD
-        </Button>
+        <Box sx={{ position: 'absolute', bottom: 35, right: 50, zIndex: 20, display: 'flex', gap: 1 }}>
+          <Button
+            color="primary"
+            variant="contained"
+            onClick={handleSave}
+            aria-label="Download"
+            sx={{ textTransform: 'none' }}
+          >
+            DOWNLOAD
+          </Button>
+          <Button
+            color="primary"
+            variant="contained"
+            onClick={handleLoadMedia}
+            aria-label="Load Media"
+            sx={{ textTransform: 'none' }}
+          >
+            LOAD MEDIA
+          </Button>
+        </Box>
 
         {/* editor div */}
         <div
