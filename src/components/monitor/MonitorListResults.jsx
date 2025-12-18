@@ -793,4 +793,4 @@ MonitorListResults.propTypes = {
 
 export default MonitorListResults;
 
-// --- IGNORE ---
+// -- IGNORE --
