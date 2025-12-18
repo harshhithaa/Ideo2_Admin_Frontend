@@ -276,7 +276,49 @@ const MonitorListResults = (props) => {
         : (rawPlaylistName || 'Unknown');
 
     const playlistType = status.PlaylistType || status.playlistType || 'Default';
-    const currentMedia = status.CurrentMedia || status.currentMedia;
+    // Resolve media display name: prefer friendly file/name, fall back to ID
+    const currentMediaRaw = status.CurrentMedia || status.currentMedia;
+    const resolveMediaDisplayName = (mediaValue) => {
+      if (!mediaValue) return null;
+      const val = String(mediaValue);
+
+      // If it looks like a UUID/Ref (contains dash and length), try to lookup in playlists
+      const maybeRef = /[0-9a-fA-F\-]{8,}/.test(val);
+      if (maybeRef && Array.isArray(playlists)) {
+        for (const pl of playlists) {
+          const candidateArrays = [
+            pl.MediaList,
+            pl.Media,
+            pl.Medias,
+            pl.Items,
+            pl.files,
+            pl.list,
+            pl.Files
+          ];
+          for (const arr of candidateArrays) {
+            if (!Array.isArray(arr)) continue;
+            for (const item of arr) {
+              if (!item) continue;
+              // common id field names to match ref
+              const refs = [item.MediaRef, item.MediaID, item.Id, item.IdRef, item.FileRef].filter(Boolean).map(String);
+              if (refs.includes(val)) {
+                return item.Name || item.FileName || item.Filename || item.MediaName || item.Path || item.Url || val;
+              }
+            }
+          }
+        }
+      }
+
+      // If not a ref or not found, try to return basename if it looks like a path/filename
+      try {
+        const nameParts = val.split(/[\\/]/);
+        const last = nameParts[nameParts.length - 1];
+        return last;
+      } catch (e) {
+        return val;
+      }
+    };
+    const currentMedia = resolveMediaDisplayName(currentMediaRaw);
     const mediaIndex = status.MediaIndex ?? status.mediaIndex;
     const totalMedia = status.TotalMedia ?? status.totalMedia;
     const healthStatus = status.HealthStatus || status.healthStatus;
