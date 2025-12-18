@@ -268,7 +268,13 @@ const MonitorListResults = (props) => {
     }
 
     // Get playlist name - this ONLY affects display, not schedule execution
-    const playlistName = status.CurrentPlaylist || status.currentPlaylist || 'Unknown';
+    // If device reports the literal "Default", prefer monitor.DefaultPlaylistName (fallback)
+    const rawPlaylistName = status.CurrentPlaylist || status.currentPlaylist || '';
+    const playlistName =
+      (rawPlaylistName && rawPlaylistName.toString().toLowerCase() === 'default' && monitor.DefaultPlaylistName)
+        ? monitor.DefaultPlaylistName
+        : (rawPlaylistName || 'Unknown');
+
     const playlistType = status.PlaylistType || status.playlistType || 'Default';
     const currentMedia = status.CurrentMedia || status.currentMedia;
     const mediaIndex = status.MediaIndex ?? status.mediaIndex;
