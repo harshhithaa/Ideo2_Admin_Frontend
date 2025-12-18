@@ -197,6 +197,29 @@ const CreatePlaylist = (props) => {
     return false;
   };
 
+  // NEW: set priority value only (do NOT reorder visual list). Keep SelectionId stable.
+  const changePriority = (mediaRef, targetPriority) => {
+    setplaylistMedia((prev) => {
+      const total = prev.length;
+      const num = Number(targetPriority);
+      if (!Number.isFinite(num) || num < 1 || num > total) return prev;
+      return prev.map((it) => (it.MediaRef === mediaRef ? { ...it, Priority: num } : it));
+    });
+  };
+  
+  // helper to validate and apply priority from input (called onBlur/Enter)
+  const onPriorityInputChange = (mediaRef, value) => {
+    if (value === '' || value === null || value === undefined) return;
+    const digitsOnly = /^\d+$/.test(String(value));
+    if (!digitsOnly) return;
+    const num = Number(value);
+    const total = playlistMedia.length;
+    if (num < 1 || num > total) return; // silently ignore out-of-range while editing
+
+    // NOTE: do NOT block duplicates here — final validation occurs on Save.
+    changePriority(mediaRef, num);
+  };
+
   const onGridSelectionChange = (newSelected) => {
     const added = newSelected.filter((r) => !selectedRefs.includes(r));
     const removed = selectedRefs.filter((r) => !newSelected.includes(r));
@@ -209,7 +232,7 @@ const CreatePlaylist = (props) => {
             const newSelId = selectionCounter;
             const isVideo = isVideoRef(ref);
             const durationForNew = isVideo ? null : (durationMode === 'Default' ? Number(defaultDuration) : 10);
-            
+
             // FIXED: Store complete media object, not just ref
             const mediaItem = mediaData.find((m) => m.MediaRef === ref) || globalMediaMetadata[ref];
             const fullMediaObject = {
@@ -217,10 +240,11 @@ const CreatePlaylist = (props) => {
               IsActive: 1,
               SelectionId: newSelId,
               Duration: durationForNew,
+              Priority: next.length + 1 // assign next available priority (N+1)
               // Store all metadata
-              ...extractMediaMetadata(mediaItem || { MediaRef: ref })
+              , ...extractMediaMetadata(mediaItem || { MediaRef: ref })
             };
-            
+
             next.push(fullMediaObject);
             setSelectionCounter((c) => c + 1);
           }
@@ -236,15 +260,18 @@ const CreatePlaylist = (props) => {
           const idx = next.findIndex((p) => p.MediaRef === ref);
           if (idx !== -1) {
             const [item] = next.splice(idx, 1);
-            setdeletedplaylistMedia((d) => [...d, { 
-              MediaRef: item.MediaRef, 
-              IsActive: 0, 
-              SelectionId: item.SelectionId, 
-              Duration: item.Duration || null 
+            setdeletedplaylistMedia((d) => [...d, {
+              MediaRef: item.MediaRef,
+              IsActive: 0,
+              SelectionId: item.SelectionId,
+              Duration: item.Duration || null,
+              Priority: item.Priority || null
             }]);
           }
         });
-        return next;
+        // reassign contiguous priorities after removal
+        const renumbered = next.map((it, i) => ({ ...it, Priority: i + 1 }));
+        return renumbered;
       });
     }
 
@@ -258,11 +285,13 @@ const CreatePlaylist = (props) => {
 
       setdeletedplaylistMedia((delPrev) => [
         ...delPrev,
-        { MediaRef: toRemove.MediaRef, IsActive: 0, SelectionId: selectionId, Duration: toRemove.Duration || null }
+        { MediaRef: toRemove.MediaRef, IsActive: 0, SelectionId: selectionId, Duration: toRemove.Duration || null, Priority: toRemove.Priority || null }
       ]);
 
       setSelectedRefs((s) => s.filter((r) => r !== toRemove.MediaRef));
-      return prev.filter((p) => p.SelectionId !== selectionId);
+      const next = prev.filter((p) => p.SelectionId !== selectionId);
+      // renumber priorities
+      return next.map((it, i) => ({ ...it, Priority: i + 1 }));
     });
   }
 
@@ -365,6 +394,21 @@ const CreatePlaylist = (props) => {
       return;
     }
 
+    // NEW: Prevent save when duplicate priorities exist
+    {
+      const counts = {};
+      for (const p of playlistMedia.filter(pm => pm.IsActive === 1)) {
+        const pr = p.Priority === '' || p.Priority === null || p.Priority === undefined ? null : Number(p.Priority);
+        if (pr === null || Number.isNaN(pr)) continue;
+        counts[pr] = (counts[pr] || 0) + 1;
+        if (counts[pr] > 1) {
+          // show small warning and prevent save
+          showDurationSnackbar('Duplicate priorities assigned to multiple items');
+          return;
+        }
+      }
+    }
+
     // Validate durations once at save time (and show the same error popup if corrections made)
     let anyCorrections = false;
     let anyMinCorrection = false;
@@ -402,16 +446,19 @@ const CreatePlaylist = (props) => {
       }
     }
 
-    const sanitizedPlaylist = validatedMedia.map((p) => {
-      const isVideo = isVideoRef(p.MediaRef);
-      let dur = p.Duration;
-      if (isVideo) dur = null;
-      else {
-        const n = Number(dur || (durationMode === 'Default' ? defaultDuration : 10));
-        dur = isNaN(n) ? 10 : Math.min(60, Math.max(5, n));
-      }
-      return { MediaRef: p.MediaRef, IsActive: p.IsActive, Duration: dur };
-    });
+    const sanitizedPlaylist = validatedMedia
+      .map((p) => {
+        const isVideo = isVideoRef(p.MediaRef);
+        let dur = p.Duration;
+        if (isVideo) dur = null;
+        else {
+          const n = Number(dur || (durationMode === 'Default' ? defaultDuration : 10));
+          dur = isNaN(n) ? 10 : Math.min(60, Math.max(5, n));
+        }
+        return { MediaRef: p.MediaRef, IsActive: p.IsActive, Duration: dur, Priority: p.Priority || null };
+      })
+      // ensure backend receives items ordered by Priority ascending
+      .sort((a, b) => (Number(a.Priority || 0) - Number(b.Priority || 0)));
 
     const savePlaylistData = {
       playlistName: title,
@@ -420,7 +467,7 @@ const CreatePlaylist = (props) => {
       defaultDuration: durationMode === 'Default' ? defaultDuration : null,  // ✅ Save default duration
       playlist: [
         ...sanitizedPlaylist,
-        ...deletedplaylistMedia.map((p) => ({ MediaRef: p.MediaRef, IsActive: p.IsActive, Duration: p.Duration || null }))
+        ...deletedplaylistMedia.map((p) => ({ MediaRef: p.MediaRef, IsActive: p.IsActive, Duration: p.Duration || null, Priority: p.Priority || null }))
       ],
       isActive: 1
     };
@@ -445,13 +492,14 @@ const CreatePlaylist = (props) => {
         if (duration !== undefined && duration !== null && !m.MediaType?.toLowerCase().includes('video')) {
           duration = Math.max(5, Number(duration) || 10);
         }
-        
+
         // FIXED: Store complete media object with all metadata
         return {
           MediaRef: m.MediaRef,
           IsActive: m.IsActive !== undefined ? m.IsActive : 1,
           SelectionId: idx + 1,
           Duration: duration !== undefined ? duration : (m.MediaType && m.MediaType.toLowerCase().includes('video') ? null : 10),
+          Priority: m.Priority || (idx + 1),
           // Store all metadata
           MediaName: m.MediaName || m.fileName || m.FileName || 'Unknown',
           MediaPath: m.MediaPath || m.fileUrl || m.FileUrl || '',
@@ -460,10 +508,14 @@ const CreatePlaylist = (props) => {
           FileMimetype: m.MediaType || m.FileType || ''
         };
       });
-      
-      setplaylistMedia(initialSelections.filter(sel => sel.IsActive === 1));
-      setdeletedplaylistMedia(initialSelections.filter(sel => sel.IsActive === 0));
-      setSelectedRefs(initialSelections.filter(sel => sel.IsActive === 1).map(sel => sel.MediaRef));
+
+      // ensure priorities are contiguous and sorted
+      initialSelections.sort((a, b) => (Number(a.Priority || 0) - Number(b.Priority || 0)));
+      const normalized = initialSelections.map((it, i) => ({ ...it, Priority: i + 1 }));
+
+      setplaylistMedia(normalized.filter(sel => sel.IsActive === 1));
+      setdeletedplaylistMedia(normalized.filter(sel => sel.IsActive === 0));
+      setSelectedRefs(normalized.filter(sel => sel.IsActive === 1).map(sel => sel.MediaRef));
       setSelectionCounter(initialSelections.length + 1);
 
       // ✅ AUTO-DETECT DURATION MODE FROM EXISTING DURATIONS
@@ -771,8 +823,52 @@ const CreatePlaylist = (props) => {
                                   {mediaName}
                                 </Typography>
                                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                  Priority: {idx + 1} — {isVideo ? 'Video (full length)' : `Image`}
+                                  Priority: {p.Priority || (idx + 1)} — {isVideo ? 'Video (full length)' : `Image`}
                                 </Typography>
+                              </Box>
+
+                              {/* Priority field (shows for both image & video; editable) */}
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 11, mr: 0.5, whiteSpace: 'nowrap' }}>
+                                  Priority
+                                </Typography>
+                                <TextField
+                                  size="small"
+                                  value={p.Priority === '' ? '' : (p.Priority || (idx + 1))}
+                                  onChange={(e) => {
+                                    // allow backspace/empty while typing; strip non-digits otherwise
+                                    const raw = e.target.value;
+                                    const v = raw === '' ? '' : raw.replace(/[^\d]/g, '');
+                                    // update only the local value — do NOT warn about duplicates here
+                                    setplaylistMedia((prev) => prev.map((it) => (it.MediaRef === p.MediaRef ? { ...it, Priority: v } : it)));
+                                  }}
+                                  onBlur={() => {
+                                    // On blur just normalise or apply a valid number.
+                                    const item = playlistMedia.find((it) => it.MediaRef === p.MediaRef);
+                                    const val = item && item.Priority;
+                                    const total = playlistMedia.length;
+                                    if (val === '' || val === null || val === undefined) {
+                                      // restore contiguous numbering display (no reordering)
+                                      setplaylistMedia((prev) => prev.map((it, i) => ({ ...it, Priority: i + 1 })));
+                                      return;
+                                    }
+                                    const num = Number(val);
+                                    if (!Number.isNaN(num) && num >= 1 && num <= total) {
+                                      // apply change locally; final duplicate check happens on Save
+                                      changePriority(p.MediaRef, num);
+                                    } else {
+                                      // out of range -> restore contiguous numbering (no snackbar here)
+                                      setplaylistMedia((prev) => prev.map((it, i) => ({ ...it, Priority: i + 1 })));
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') onPriorityInputChange(p.MediaRef, e.target.value);
+                                  }}
+                                  inputProps={{ style: { width: 56, textAlign: 'center' }, min: 1, max: playlistMedia.length }}
+                                  disabled={isViewMode} /* editable for videos too */
+                                  sx={{ width: 72 }}
+                                  aria-label="Priority"
+                                />
                               </Box>
 
                               {/* duration controls (images only) */}
