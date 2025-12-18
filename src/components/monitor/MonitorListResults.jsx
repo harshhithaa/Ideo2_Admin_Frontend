@@ -338,7 +338,7 @@ const MonitorListResults = (props) => {
     const tooltipContent = (
       <Box sx={{ p: 0.5 }}>
         <Typography variant="caption" sx={{ display: 'block', fontWeight: 600 }}>
-          Current Playlist: {playlistName}
+          Current Playlist Name: {playlistName}
         </Typography>
         <Typography variant="caption" sx={{ display: 'block' }}>
           Type: {playlistType}
