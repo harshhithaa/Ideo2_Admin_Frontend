@@ -335,6 +335,23 @@ const MonitorListResults = (props) => {
       (errors && errors.length > 0) ||
       isProgressing === false;
 
+    // Helper to format LastUpdate as "DD/MM/YYYY HH:MM AM/PM"
+    const formatDateTime = (ts) => {
+      if (!ts) return 'N/A';
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return String(ts);
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      let hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      if (hours === 0) hours = 12;
+      const hh = String(hours).padStart(2, '0');
+      return `${dd}/${mm}/${yyyy} ${hh}:${minutes} ${ampm}`;
+    };
+
     const tooltipContent = (
       <Box sx={{ p: 0.5 }}>
         <Typography variant="caption" sx={{ display: 'block', fontWeight: 600 }}>
@@ -360,7 +377,7 @@ const MonitorListResults = (props) => {
           </Typography>
         )}
         <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontSize: '0.7rem' }}>
-          Last Update: {new Date(status.LastUpdate).toLocaleString()}
+          Last Update: {formatDateTime(status.LastUpdate)}
         </Typography>
         <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
           ({status.SecondsSinceUpdate}s ago)
@@ -457,9 +474,25 @@ const MonitorListResults = (props) => {
       return s?.Title || s?.ScheduleName || s?.Name || s?.title || 'Untitled Schedule';
     };
 
+    // Resolve playlist name assigned to a schedule (if present)
+    const resolveScheduledPlaylistName = (s) => {
+      if (!s) return '';
+      // Direct name fields
+      const directName = s?.PlaylistName || s?.AssignedPlaylistName || s?.ScheduledPlaylist || s?.Playlist;
+      if (directName) return directName;
+      // Try PlaylistRef lookup from playlists prop
+      const ref = s?.PlaylistRef || s?.PlaylistID || s?.PlaylistRefId;
+      if (ref && Array.isArray(playlists)) {
+        const found = playlists.find(p => p.PlaylistRef === ref || p.PlaylistID === ref || String(p.PlaylistRef) === String(ref));
+        return found ? found.Name : '';
+      }
+      return '';
+    };
+
     if (schedules.length === 1) {
       const schedule = schedules[0];
       const name = getScheduleName(schedule);
+      const scheduledPlaylistName = resolveScheduledPlaylistName(schedule);
 
       return (
         <Tooltip
@@ -468,6 +501,11 @@ const MonitorListResults = (props) => {
               {/* Show schedule name with explicit label */}
               <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>
                 Schedule Name: {name}
+              </Typography>
+
+              {/* ADDED: Scheduled Playlist for this schedule */}
+              <Typography variant="caption" sx={{ display: 'block' }}>
+                Scheduled Playlist: {scheduledPlaylistName || 'Unknown'}
               </Typography>
 
               {/* DATES first (DD/MM/YYYY) */}
@@ -517,6 +555,7 @@ const MonitorListResults = (props) => {
             </Typography>
             {schedules.map((schedule, idx) => {
               const name = getScheduleName(schedule);
+              const scheduledPlaylistName = resolveScheduledPlaylistName(schedule);
               return (
                 <Box
                   key={idx}
@@ -529,6 +568,11 @@ const MonitorListResults = (props) => {
                   {/* Show schedule name with explicit label */}
                   <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>
                     Schedule Name: {name}
+                  </Typography>
+
+                  {/* ADDED: Scheduled Playlist for this schedule */}
+                  <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
+                    Scheduled Playlist: {scheduledPlaylistName || 'Unknown'}
                   </Typography>
 
                   {/* DATES first (DD/MM/YYYY) */}
