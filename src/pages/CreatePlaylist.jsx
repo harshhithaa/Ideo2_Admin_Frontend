@@ -867,36 +867,29 @@ const CreatePlaylist = (props) => {
                               </Box>
 
                               {/* Priority field (shows for both image & video; editable) */}
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
-                                <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 11, mr: 0.5, whiteSpace: 'nowrap' }}>
-                                  Priority
-                                </Typography>
+                              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
                                 <TextField
+                                  label="Priority"
                                   size="small"
+                                  variant="outlined"
                                   value={p.Priority === '' ? '' : (p.Priority || (idx + 1))}
                                   onChange={(e) => {
-                                    // allow backspace/empty while typing; strip non-digits otherwise
                                     const raw = e.target.value;
                                     const v = raw === '' ? '' : raw.replace(/[^\d]/g, '');
-                                    // update only the local value — do NOT warn about duplicates here
                                     setplaylistMedia((prev) => prev.map((it) => (it.MediaRef === p.MediaRef ? { ...it, Priority: v } : it)));
                                   }}
                                   onBlur={() => {
-                                    // On blur just normalise or apply a valid number.
                                     const item = playlistMedia.find((it) => it.MediaRef === p.MediaRef);
                                     const val = item && item.Priority;
                                     const total = playlistMedia.length;
                                     if (val === '' || val === null || val === undefined) {
-                                      // restore contiguous numbering display (no reordering)
                                       setplaylistMedia((prev) => prev.map((it, i) => ({ ...it, Priority: i + 1 })));
                                       return;
                                     }
                                     const num = Number(val);
                                     if (!Number.isNaN(num) && num >= 1 && num <= total) {
-                                      // apply change locally; final duplicate check happens on Save
                                       changePriority(p.MediaRef, num);
                                     } else {
-                                      // out of range -> restore contiguous numbering (no snackbar here)
                                       setplaylistMedia((prev) => prev.map((it, i) => ({ ...it, Priority: i + 1 })));
                                     }
                                   }}
@@ -904,57 +897,97 @@ const CreatePlaylist = (props) => {
                                     if (e.key === 'Enter') onPriorityInputChange(p.MediaRef, e.target.value);
                                   }}
                                   inputProps={{ style: { width: 56, textAlign: 'center' }, min: 1, max: playlistMedia.length }}
-                                  disabled={isViewMode} /* editable for videos too */
+                                  disabled={isViewMode}
                                   sx={{ width: 72 }}
                                   aria-label="Priority"
+                                  InputLabelProps={{
+                                    sx: { color: 'text.primary', fontWeight: 550, fontSize: '0.875rem' }
+                                  }}
                                 />
                               </Box>
-
+ 
                               {/* duration controls (images only) */}
                               {!isVideo ? (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
-                                  {durationMode === 'Default' ? (
-                                    <>
-                                      {/* Default mode: only show locked duration + lock icon */}
-                                      <TextField
-                                        size="small"
-                                        value={Number(defaultDuration)}
-                                        inputProps={{ style: { width: 44, textAlign: 'center' }, readOnly: true }}
-                                        disabled
-                                      />
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+                                  {/* Duration label is provided via TextField label on the inputs below */}
+ 
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                    {durationMode === 'Default' ? (
+                                      <>
+                                        <TextField
+                                          label="Duration"
+                                          size="small"
+                                          variant="outlined"
+                                          value={Number(defaultDuration)}
+                                          inputProps={{ style: { width: 44, textAlign: 'center' }, readOnly: true }}
+                                          disabled
+                                          sx={{ width: 88 }}
+                                          InputLabelProps={{
+                                            sx: { color: 'text.primary', fontWeight: 550, fontSize: '0.875rem' }
+                                          }}
+                                        />
 
-                                      <Tooltip title="Uses the selected default duration" arrow>
-                                        <Box sx={{ ml: 0.5, color: 'text.secondary', display: 'flex', alignItems: 'center' }}>
-                                          <LockIcon fontSize="small" />
-                                        </Box>
-                                      </Tooltip>
-                                    </>
-                                  ) : (
-                                    <>
-                                      {/* Custom mode — fully editable with +/- */}
-                                      <IconButton size="small" onClick={() => adjustDuration(p.MediaRef, -1)} disabled={isViewMode}>
-                                        <RemoveIcon fontSize="small" />
-                                      </IconButton>
-
-                                      <TextField
-                                        size="small"
-                                        value={p.Duration === '' ? '' : (p.Duration || 10)}
-                                        onChange={(e) => onDurationInputChange(p.MediaRef, e.target.value)}
-                                        onBlur={() => onDurationBlur(p.MediaRef)}
-                                        inputProps={{ style: { width: 44, textAlign: 'center' } }}
-                                        disabled={isViewMode}
-                                      />
-
-                                      <IconButton size="small" onClick={() => adjustDuration(p.MediaRef, +1)} disabled={isViewMode}>
-                                        <AddIcon fontSize="small" />
-                                      </IconButton>
-                                    </>
-                                  )}
+                                        <Tooltip title="Uses the selected default duration" arrow>
+                                          <Box sx={{ ml: 0.5, color: 'text.secondary', display: 'flex', alignItems: 'center' }}>
+                                            <LockIcon fontSize="small" />
+                                          </Box>
+                                        </Tooltip>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <TextField
+                                          label="Duration"
+                                          size="small"
+                                          variant="outlined"
+                                          value={p.Duration === '' ? '' : (p.Duration || 10)}
+                                          onChange={(e) => onDurationInputChange(p.MediaRef, e.target.value)}
+                                          onBlur={() => onDurationBlur(p.MediaRef)}
+                                          disabled={isViewMode}
+                                          sx={{ width: 88 }}
+                                          inputProps={{ style: { width: 44, textAlign: 'center' } }}
+                                          InputLabelProps={{
+                                            sx: { color: 'text.primary', fontWeight: 550, fontSize: '0.875rem' }
+                                          }}
+                                          InputProps={{
+                                            startAdornment: (
+                                              <InputAdornment position="start" sx={{ mr: 0.6 }}>
+                                                <IconButton
+                                                  size="small"
+                                                  onClick={() => adjustDuration(p.MediaRef, -1)}
+                                                  disabled={isViewMode}
+                                                  edge="start"
+                                                  aria-label="decrease duration"
+                                                  sx={{ p: 0.3, fontSize: '0.85rem' }}
+                                                >
+                                                  <RemoveIcon fontSize="inherit" />
+                                                </IconButton>
+                                              </InputAdornment>
+                                            ),
+                                            endAdornment: (
+                                              <InputAdornment position="end" sx={{ ml: 0.6 }}>
+                                                <IconButton
+                                                  size="small"
+                                                  onClick={() => adjustDuration(p.MediaRef, +1)}
+                                                  disabled={isViewMode}
+                                                  edge="end"
+                                                  aria-label="increase duration"
+                                                  sx={{ p: 0.3, fontSize: '0.85rem' }}
+                                                >
+                                                  <AddIcon fontSize="inherit" />
+                                                </IconButton>
+                                              </InputAdornment>
+                                            )
+                                          }}
+                                        />
+                                      </>
+                                    )}
+                                  </Box>
                                 </Box>
-                              ) : (
-                                <Typography variant="body2" sx={{ color: 'text.secondary', mr: 1, flexShrink: 0 }}>Plays full video</Typography>
-                              )}
+                               ) : (
+                                 <Typography variant="body2" sx={{ color: 'text.secondary', mr: 1, flexShrink: 0 }}>Plays full video</Typography>
+                               )}
 
+                              {/* remove button */}
                               {!isViewMode && (
                                 <IconButton color="error" onClick={() => removeSelection(p.SelectionId)} sx={{ flexShrink: 0 }}>
                                   <RemoveCircleOutlineIcon />
