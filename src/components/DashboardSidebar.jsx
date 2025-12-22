@@ -64,15 +64,34 @@ const DashboardSidebar = ({ onMobileClose, openMobile }) => {
       }}
     >
       <Box sx={{ p: 2 }}>
-        <List>
-          {items.map((item) => (
-            <NavItem
-              href={item.href}
-              key={item.title}
-              title={item.title}
-              icon={item.icon}
-            />
-          ))}
+        <List
+          sx={{
+            // style active/selected list items to match app theme
+            '& .Mui-selected': {
+              backgroundColor: 'rgba(99,102,241,0.12)', // light blue accent
+              color: 'primary.main',
+              borderRadius: 1
+            },
+            '& .MuiListItemButton-root': {
+              borderRadius: 1
+            }
+          }}
+        >
+          {items.map((item) => {
+            const selected =
+              location.pathname === item.href ||
+              location.pathname.startsWith(item.href + '/');
+
+            return (
+              <NavItem
+                href={item.href}
+                key={item.title}
+                title={item.title}
+                icon={item.icon}
+                selected={selected}
+              />
+            );
+          })}
         </List>
       </Box>
     </Box>

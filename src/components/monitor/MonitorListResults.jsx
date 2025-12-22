@@ -120,33 +120,26 @@ const MonitorListResults = (props) => {
 
   // Fetch status for a single monitor
   const handleRefreshStatus = async (monitorRef) => {
-    console.log('🔵 handleRefreshStatus called for:', monitorRef);
     setLoadingStatus(prev => ({ ...prev, [monitorRef]: true }));
     
     try {
       await props.getMonitorStatusRealtime(monitorRef, (response) => {
-        console.log('🔵 Raw callback response:', response);
-        
-        // ✅ FIX: Handle the actual response structure {exists, data}
+        // Handle the actual response structure {exists, data}
         if (response && response.data && !response.Error) {
-          console.log('✅ Setting status for', monitorRef, 'with data:', response.data);
           setMonitorStatuses(prev => {
             const newState = {
               ...prev,
               [monitorRef]: response.data
             };
-            console.log('✅ New monitorStatuses state:', newState);
             return newState;
           });
         } else if (response && response.Details) {
           // Fallback for standard API response format
-          console.log('✅ Setting status (Details format) for', monitorRef);
           setMonitorStatuses(prev => ({
             ...prev,
             [monitorRef]: response.Details
           }));
         } else {
-          console.log('⚠️ No data in response');
           setMonitorStatuses(prev => ({
             ...prev,
             [monitorRef]: { error: 'No data available' }
@@ -155,7 +148,6 @@ const MonitorListResults = (props) => {
         setLoadingStatus(prev => ({ ...prev, [monitorRef]: false }));
       });
     } catch (error) {
-      console.error('❌ Exception caught:', error);
       setMonitorStatuses(prev => ({
         ...prev,
         [monitorRef]: { error: error.message || 'Failed to fetch status' }
@@ -476,17 +468,93 @@ const MonitorListResults = (props) => {
 
     // Resolve playlist name assigned to a schedule (if present)
     const resolveScheduledPlaylistName = (s) => {
-      if (!s) return '';
-      // Direct name fields
-      const directName = s?.PlaylistName || s?.AssignedPlaylistName || s?.ScheduledPlaylist || s?.Playlist;
-      if (directName) return directName;
-      // Try PlaylistRef lookup from playlists prop
-      const ref = s?.PlaylistRef || s?.PlaylistID || s?.PlaylistRefId;
-      if (ref && Array.isArray(playlists)) {
-        const found = playlists.find(p => p.PlaylistRef === ref || p.PlaylistID === ref || String(p.PlaylistRef) === String(ref));
-        return found ? found.Name : '';
+      if (!s) return 'Unknown';
+
+      // 1) direct name fields on the minimal schedule object
+      const directSimpleName =
+        s?.PlaylistName ||
+        s?.AssignedPlaylistName ||
+        s?.ScheduledPlaylist ||
+        s?.PlaylistNameDisplay;
+      if (directSimpleName) return directSimpleName;
+
+      // 2) attempt to find full schedule by ScheduleId or ScheduleRef in supplied schedules list
+      const scheduleId = s?.ScheduleId ?? s?.Id;
+      const scheduleRef = s?.ScheduleRef ?? s?.ScheduleRefId;
+      let fullSchedule = null;
+
+      // If parent schedules haven't loaded yet but this schedule has an id/ref,
+      // signal "loading" by returning undefined so callers can show a spinner.
+      if (Array.isArray(props.schedules) && props.schedules.length === 0 && (scheduleId || scheduleRef)) {
+        return undefined;
       }
-      return '';
+ 
+   // Use the full schedule list passed via props (Redux) — monitor.Schedules contains only minimal entries
+   if (scheduleId && Array.isArray(props.schedules)) {
+     fullSchedule = props.schedules.find((sch) =>
+       sch?.Id === scheduleId ||
+       sch?.ScheduleId === scheduleId ||
+       String(sch?.Id) === String(scheduleId) ||
+       String(sch?.ScheduleId) === String(scheduleId)
+     );
+   }
+ 
+   if (!fullSchedule && scheduleRef && Array.isArray(props.schedules)) {
+     fullSchedule = props.schedules.find((sch) =>
+       sch?.ScheduleRef === scheduleRef ||
+       String(sch?.ScheduleRef) === String(scheduleRef)
+     );
+   }
+
+      if (fullSchedule) {
+        // try direct playlist name fields on full schedule
+        const directFullName =
+          fullSchedule?.PlaylistName ||
+          fullSchedule?.AssignedPlaylistName ||
+          fullSchedule?.ScheduledPlaylist ||
+          fullSchedule?.PlaylistNameDisplay;
+        if (directFullName) return directFullName;
+
+        // try PlaylistRef/ID on full schedule to lookup playlists array
+        const ref =
+          fullSchedule?.PlaylistRef ??
+          fullSchedule?.PlaylistID ??
+          fullSchedule?.PlaylistId ??
+          fullSchedule?.Playlist;
+        if (ref && Array.isArray(playlists)) {
+          const found = playlists.find((p) => {
+            const candidates = [
+              p?.PlaylistRef,
+              p?.PlaylistID,
+              p?.Id,
+              p?.IdRef,
+              p?.Ref,
+              p?.PlaylistId,
+              p?.playlistRef,
+              p?.playlistID,
+              p?.playlistId,
+              p?.Name,
+              p?.name
+            ];
+            return candidates.some((c) => c !== undefined && String(c) === String(ref));
+          });
+          if (found) {
+            return found?.Name || found?.PlaylistName || found?.name || found?.Title || 'Unknown';
+          }
+        }
+
+        // if fullSchedule directly embeds a playlist object
+        if (fullSchedule?.Playlist && typeof fullSchedule.Playlist === 'object') {
+          return fullSchedule.Playlist.Name || fullSchedule.Playlist.PlaylistName || fullSchedule.Playlist.name || 'Unknown';
+        }
+      }
+
+      // 3) as last resort check if schedule contains a playlist object
+      if (s?.Playlist && typeof s.Playlist === 'object') {
+        return s.Playlist.Name || s.Playlist.PlaylistName || s.Playlist.name || 'Unknown';
+      }
+
+      return 'Unknown';
     };
 
     if (schedules.length === 1) {
@@ -498,26 +566,21 @@ const MonitorListResults = (props) => {
         <Tooltip
           title={
             <Box sx={{ p: 0.5, maxHeight: '400px', overflowY: 'auto' }}>
-              {/* Show schedule name with explicit label */}
               <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>
                 Schedule Name: {name}
               </Typography>
-
-              {/* ADDED: Scheduled Playlist for this schedule */}
-              <Typography variant="caption" sx={{ display: 'block' }}>
-                Scheduled Playlist: {scheduledPlaylistName || 'Unknown'}
+              <Typography variant="caption" sx={{ display: 'block', fontWeight: 600 }}>
+                 Scheduled Playlist Name: { (scheduledPlaylistName === undefined && Array.isArray(props.schedules) && props.schedules.length === 0 && (schedule?.ScheduleId || schedule?.ScheduleRef))
+                   ? <CircularProgress size={12} />
+                   : (scheduledPlaylistName || 'Unknown')
+                 }
               </Typography>
-
-              {/* DATES first (DD/MM/YYYY) */}
               <Typography variant="caption" sx={{ display: 'block' }}>
                 Dates: {formatDate(schedule?.StartDate) || 'N/A'} to {formatDate(schedule?.EndDate) || 'N/A'}
               </Typography>
-
-              {/* TIME after dates */}
               <Typography variant="caption" sx={{ display: 'block' }}>
                 Time: {schedule?.StartTime || 'N/A'} - {schedule?.EndTime || 'N/A'}
               </Typography>
-
               {schedule?.Days && (
                 <Typography variant="caption" sx={{ display: 'block' }}>
                   Days: {Array.isArray(schedule.Days) ? schedule.Days.join(', ') : schedule.Days}
@@ -556,35 +619,30 @@ const MonitorListResults = (props) => {
             {schedules.map((schedule, idx) => {
               const name = getScheduleName(schedule);
               const scheduledPlaylistName = resolveScheduledPlaylistName(schedule);
-              return (
-                <Box
-                  key={idx}
-                  sx={{
-                    mb: 1,
-                    pb: 1,
-                    borderBottom: idx < schedules.length - 1 ? '1px solid rgba(255,255,255,0.2)' : 'none'
-                  }}
-                >
-                  {/* Show schedule name with explicit label */}
-                  <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>
-                    Schedule Name: {name}
-                  </Typography>
-
-                  {/* ADDED: Scheduled Playlist for this schedule */}
-                  <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
-                    Scheduled Playlist: {scheduledPlaylistName || 'Unknown'}
-                  </Typography>
-
-                  {/* DATES first (DD/MM/YYYY) */}
+               return (
+                 <Box
+                   key={idx}
+                   sx={{
+                     mb: 1,
+                     pb: 1,
+                     borderBottom: idx < schedules.length - 1 ? '1px solid rgba(255,255,255,0.2)' : 'none'
+                   }}
+                 >
+                   <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>
+                     Schedule Name: {name}
+                   </Typography>
+                   <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
+                     Scheduled Playlist Name: { (scheduledPlaylistName === undefined && Array.isArray(props.schedules) && props.schedules.length === 0 && (schedule?.ScheduleId || schedule?.ScheduleRef))
+                       ? <CircularProgress size={12} />
+                       : (scheduledPlaylistName || 'Unknown')
+                     }
+                   </Typography>
                   <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
                     Dates: {formatDate(schedule?.StartDate) || 'N/A'} to {formatDate(schedule?.EndDate) || 'N/A'}
                   </Typography>
-
-                  {/* TIME after dates */}
                   <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
                     Time: {schedule?.StartTime || 'N/A'} - {schedule?.EndTime || 'N/A'}
                   </Typography>
-
                   {schedule?.Days && (
                     <Typography variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
                       Days: {Array.isArray(schedule.Days) ? schedule.Days.join(', ') : schedule.Days}
@@ -832,9 +890,8 @@ const MonitorListResults = (props) => {
 MonitorListResults.propTypes = {
   monitors: PropTypes.array,
   getMonitorStatusRealtime: PropTypes.func,
-  playlists: PropTypes.array
+  playlists: PropTypes.array,
+  schedules: PropTypes.array
 };
 
 export default MonitorListResults;
-
-// -- IGNORE --

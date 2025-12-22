@@ -33,26 +33,28 @@ const MonitorList = (props) => {
       componenttype: COMPONENTS.Playlist
     };
 
-    props.getUserComponentList(data, (err) => {
-      if (err.exists) {
-        console.log(err.errmessage);
-      } else {
-        console.log(monitorlist);
-        setmonitors(monitorlist ? monitorlist.list : []);
-        setLoader(true);
-      }
-    });
+    const dataForSchedule = {
+      componenttype: COMPONENTS.Schedule
+    };
 
-    props.getUserComponentList(dataForPlaylist, (err) => {
-      if (err.exists) {
-        console.log(err.errmessage);
-      } else {
-        console.log(monitorlist);
-        setPlaylists(monitorlist ? monitorlist.playlistList : []);
-        setLoader(true);
-      }
+    // Fetch monitors first then playlists to avoid race/overwrite in Redux
+    props.getUserComponentList(data, (err) => {
+      // request playlists after monitors to reduce chance of Redux overwrite/race
+      props.getUserComponentList(dataForPlaylist, (err2) => {
+        // eagerly fetch schedules so MonitorList has full schedule data available
+        props.getUserComponentList(dataForSchedule, () => {});
+      });
     });
-  }, [loader]);
+  }, []); // run once on mount
+
+  // Update local state whenever Redux prop changes
+  useEffect(() => {
+    if (monitorlist) {
+      setmonitors(monitorlist.list || []);
+      setPlaylists(monitorlist.playlistList || []);
+      setLoader(true);
+    }
+  }, [monitorlist]);
 
   const style = {
     position: 'absolute',
@@ -141,6 +143,7 @@ const MonitorList = (props) => {
               search={search}
               monitors={monitors}
               playlists={playlists}
+              schedules={monitorlist?.scheduleList || []}  // ✅ added schedules prop
               view={(e) =>
                 navigate('/app/savemonitor', { state: { ...e, type: 'View' } })
               }

@@ -158,7 +158,7 @@ const MediaList = (props) => {
     if (!rawPath) return null;
     let p = String(rawPath);
     p = p.replace(/\\/g, '/').trim();
-    if (p.indexOf('undefined') !== -1) return null;
+    if (p === 'undefined' || p === 'null' || !p) return null
     if (/^https?:\/\//i.test(p)) return p;
     if (p.startsWith('/')) return `${window.location.origin}${p}`;
     try { return `${window.location.origin}/${encodeURI(p)}`; } catch (e) { return p; }

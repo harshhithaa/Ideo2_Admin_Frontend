@@ -302,4 +302,344 @@ button, .MuiButton-root {
   #photo, canvas#background { max-height: 50vh !important; }
 }
 
+/* =========================
+   Appended responsive helpers (non-destructive)
+   Tablet: 768px–1024px, Mobile: <=720px
+   Add classes to shared components where needed.
+   ========================= */
+
+/* Helpers (optional to apply) */
+.nav-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.nav-menu { display: flex; gap: 12px; align-items: center; }
+.nav-toggle { display: none; background: transparent; border: 0; padding: 8px; cursor: pointer; }
+.stack-on-tablet { display: flex; gap: 12px; }
+.stack-on-mobile { display: flex; gap: 8px; flex-wrap: wrap; }
+.responsive-form { width: 100%; }
+.full-width-input { width: auto; box-sizing: border-box; }
+.touch-target { min-width: 48px; min-height: 48px; padding: 10px 12px; box-sizing: border-box; }
+.responsive-media, img.responsive, video.responsive, canvas.responsive { max-width: 100%; height: auto; display: block; object-fit: contain; }
+.sidebar, .side-panel { width: 100%; }
+
+/* Tablet: 768px - 1024px */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .stack-on-tablet { flex-direction: column; }
+  .nav-bar { flex-wrap: wrap; }
+  .responsive-form input,
+  .responsive-form select,
+  .responsive-form textarea,
+  .full-width-input { width: 100% !important; box-sizing: border-box; }
+  div[style*="width: 360px"] { width: 100% !important; flex: 0 0 100% !important; max-width: 100% !important; }
+  .touch-target, button, .MuiButton-root { min-height: 44px !important; padding: 10px 12px !important; }
+}
+
+/* Mobile: up to 720px */
+@media (max-width: 720px) {
+  /* Nav: toggle + collapsible menu (JS may toggle .open on .nav-menu) */
+  .nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
+  .nav-menu { display: none; width: 100%; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .nav-menu.open { display: flex; }
+
+  /* Stack layout helpers */
+  .stack-on-mobile, .stack-on-tablet { flex-direction: column !important; gap: 10px !important; }
+
+  /* Make inputs, selects, form controls full width and touch friendly */
+  .responsive-form input,
+  .responsive-form select,
+  .responsive-form textarea,
+  .full-width-input,
+  .MuiInputBase-root,
+  .MuiFormControl-root,
+  input[type="text"],
+  input[type="search"],
+  textarea,
+  select {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    min-height: 48px !important;
+    padding: 10px 12px !important;
+  }
+
+  /* Buttons & touch targets */
+  button, .MuiButton-root, .MuiIconButton-root, .touch-target {
+    min-width: 48px !important;
+    min-height: 48px !important;
+    padding: 10px 14px !important;
+    font-size: 14px !important;
+  }
+
+  /* Force table -> stacked cards (works with existing .table-responsive) */
+  .table-responsive table,
+  .table-responsive thead,
+  .table-responsive tbody,
+  .table-responsive th,
+  .table-responsive td,
+  .table-responsive tr {
+    display: block !important;
+    width: 100% !important;
+  }
+  .table-responsive thead { display: none !important; }
+  .table-responsive tbody tr {
+    display: block !important;
+    margin-bottom: 12px !important;
+    padding: 12px !important;
+    border-radius: 8px !important;
+    background: #fff !important;
+    box-shadow: 0 2px 6px rgba(16,24,40,0.04) !important;
+    border: 1px solid #eee !important;
+  }
+  .table-responsive td {
+    display: block !important;
+    text-align: right !important;
+    padding: 6px 0 !important;
+    border: none !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+  }
+  .table-responsive td::before {
+    content: attr(data-label) !important;
+    display: block !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    font-size: 0.72rem !important;
+    color: #374151 !important;
+    margin-bottom: 6px !important;
+  }
+  .table-responsive td._left,
+  .table-responsive td._actions { text-align: left !important; }
+
+  /* Ensure media/canvas scale and not overflow */
+  #photo, #photo > canvas, canvas#background,
+  .responsive-media, img.responsive, video.responsive {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 60vh !important;
+    display: block !important;
+  }
+
+  /* Convert absolute/fixed inline containers into normal flow */
+  div[style*="position: absolute"][style*="top"],
+  div[style*="position: fixed"] {
+    position: static !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Utility visibility */
+  .hide-on-mobile { display: none !important; }
+  .show-on-mobile { display: block !important; }
+}
+
+/* Very small phones (fine tuning) */
+@media (max-width: 420px) {
+  .panel { padding: 6px !important; }
+  button, .MuiButton-root { font-size: 13px !important; padding: 10px !important; }
+  #photo, canvas#background { max-height: 50vh !important; }
+}
+
+/* =========================
+   Final responsive strengthening (append only)
+   - Targets phones (<=720px) and tablets (768–1024px)
+   - Non-destructive: only new rules, sparing !important where third-party inline/MUI styles block responsive behavior
+   ========================= */
+
+/* Prevent horizontal overflow app-wide on small screens */
+@media (max-width: 720px) {
+  html, body, #root { overflow-x: hidden !important; }
+
+  /* Header / appbar: allow wrapping so icons / selects don't overlap content */
+  .MuiAppBar-root,
+  .app-header,
+  header,
+  .nav-bar {
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Ensure nav toggle shows and menu can be collapsed via .open class (JS toggle) */
+  .nav-toggle { display: inline-flex !important; }
+  .nav-menu { display: none !important; width: 100% !important; flex-direction: column !important; }
+  .nav-menu.open { display: flex !important; }
+
+  /* Make inline fixed-width elements flow into document */
+  div[style*="position: absolute"],
+  div[style*="position: fixed"],
+  div[style*="right: 0"],
+  div[style*="left: 0"] {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    left: 0 !important;
+    right: 0 !important;
+  }
+
+  /* Convert common fixed widths into fluid */
+  div[style*="width: 360px"],
+  div[style*="flex: 0 0 360px"],
+  .fixed-width, .col-fixed {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+    margin-bottom: 12px !important;
+  }
+
+  /* Make panels & papers avoid overflow */
+  .panel, .MuiPaper-root, .MuiCard-root {
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Forms & inputs: full width and touch-friendly */
+  .responsive-form,
+  .responsive-form input,
+  .responsive-form select,
+  .responsive-form textarea,
+  .full-width-input,
+  .MuiInputBase-root,
+  .MuiFormControl-root,
+  input[type="text"],
+  input[type="search"],
+  textarea,
+  select,
+  .select-fullwidth {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    min-height: 48px !important;
+    padding: 10px 12px !important;
+  }
+
+  /* Buttons and icon buttons: ensure 48x48 minimum */
+  button,
+  .MuiButton-root,
+  .MuiIconButton-root,
+  .touch-target {
+    min-width: 48px !important;
+    min-height: 48px !important;
+    padding: 10px 12px !important;
+    font-size: 14px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Make MUI tables and arbitrary table markup stack into cards (force when within .table-responsive or panels) */
+  .table-responsive table,
+  .table-responsive thead,
+  .table-responsive tbody,
+  .table-responsive tr,
+  .table-responsive th,
+  .table-responsive td,
+  .panel table,
+  .MuiTable-root {
+    table-layout: auto !important;
+    width: 100% !important;
+    display: block !important;
+  }
+
+  .table-responsive thead,
+  .panel table thead,
+  .MuiTableHead-root {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .table-responsive tbody tr,
+  .panel table tbody tr,
+  .MuiTableBody-root .MuiTableRow-root {
+    display: block !important;
+    margin-bottom: 12px !important;
+    padding: 12px !important;
+    border-radius: 8px !important;
+    background: #fff !important;
+    box-shadow: 0 2px 6px rgba(16,24,40,0.04) !important;
+    border: 1px solid #eee !important;
+    overflow: visible !important;
+  }
+
+  .table-responsive td,
+  .panel table td,
+  .MuiTableCell-root {
+    display: block !important;
+    text-align: left !important;
+    padding: 6px 0 !important;
+    border: none !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    box-sizing: border-box !important;
+  }
+
+  .table-responsive td::before,
+  .panel table td::before {
+    content: attr(data-label) !important;
+    display: block !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    font-size: 0.72rem !important;
+    color: #374151 !important;
+    margin-bottom: 6px !important;
+  }
+
+  /* Ensure images/canvases scale and do not create overflow */
+  #photo,
+  #photo > canvas,
+  canvas#background,
+  .responsive-media,
+  img.responsive,
+  video.responsive,
+  .MuiAvatar-root img {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 60vh !important;
+    display: block !important;
+    object-fit: contain !important;
+  }
+
+  /* MUI Grid & flex rows -> stack */
+  .MuiGrid-container, .row, .flex-row, .stack-on-mobile {
+    display: block !important;
+  }
+  .MuiGrid-item, .col, .col-auto {
+    width: 100% !important;
+    display: block !important;
+  }
+
+  /* Misc visibility helpers */
+  .hide-on-mobile { display: none !important; }
+  .show-on-mobile { display: block !important; }
+
+  /* Small typography tweaks to avoid overflow */
+  h1, h2, h3, h4, h5, h6, .MuiTypography-root {
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+  }
+}
+
+/* Tablet tweaks: ensure wider touch targets and stacked controls */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .container, .MuiContainer-root { max-width: 920px !important; padding-left: 12px !important; padding-right: 12px !important; }
+  .nav-bar { flex-wrap: wrap !important; }
+  .stack-on-tablet { flex-direction: column !important; gap: 12px !important; }
+  .responsive-form input, .responsive-form select, .responsive-form textarea, .full-width-input {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  div[style*="width: 360px"] { width: 100% !important; flex: 0 0 100% !important; max-width: 100% !important; margin-bottom: 12px !important; }
+  button, .MuiButton-root, .touch-target { min-height: 44px !important; padding: 10px 12px !important; }
+}
+
+/* Utility class to apply if any element still misbehaves */
+.show-full-on-mobile {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* End appended responsive strengthening */
+
 /* End of global.css */
