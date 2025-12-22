@@ -8,7 +8,11 @@ import { Formik } from 'formik';
 import React, { useState, useEffect, useRef } from 'react';
 import CardMedia from '@mui/material/CardMedia';
 import { Alert, Stack, Checkbox, Snackbar } from '@mui/material';
-import { Box, Button, Container, TextField, Typography, Grid, MenuItem, Select, FormControl, InputLabel, IconButton, Tooltip, InputAdornment } from '@mui/material';
+import { Box, Button, Container, TextField, Typography, Grid, MenuItem, Select, FormControl, InputLabel, IconButton, Tooltip, InputAdornment, Pagination, PaginationItem } from '@mui/material';
+import FirstPageIcon from '@mui/icons-material/FirstPage';
+import LastPageIcon from '@mui/icons-material/LastPage';
+import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
+import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -771,9 +775,44 @@ const CreatePlaylist = (props) => {
                         </Box>
 
                         <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                          <Button disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>Prev</Button>
-                          <Typography variant="body2">Page {currentPage} — {totalRecords} items</Typography>
-                          <Button disabled={(currentPage * pageSize) >= totalRecords} onClick={() => setCurrentPage((p) => p + 1)}>Next</Button>
+                          <Pagination
+                            count={Math.max(1, Math.ceil(totalRecords / pageSize))}
+                            page={currentPage}
+                            onChange={(e, page) => setCurrentPage(page)}
+                            siblingCount={1}
+                            boundaryCount={1}
+                            showFirstButton
+                            showLastButton
+                            sx={{
+                              '& .MuiPagination-ul': { gap: 0.5, alignItems: 'center' },
+                              '& .MuiPaginationItem-root': { color: 'text.secondary', minWidth: 32, px: 0.25 },
+                              // make page numbers circular and consistent size
+                              '& .MuiPaginationItem-page': { minWidth: 32, width: 32, height: 32, borderRadius: '50%', px: 0 },
+                              '& .MuiPaginationItem-root.Mui-selected': { bgcolor: 'primary.main', color: '#fff', boxShadow: 'none' },
+                              '& .MuiSvgIcon-root': { fontSize: 16, opacity: 0.6 }
+                            }}
+                            renderItem={(item) => (
+                              <PaginationItem
+                                {...item}
+                                components={{
+                                  first: FirstPageIcon,
+                                  previous: NavigateBeforeIcon,
+                                  next: NavigateNextIcon,
+                                  last: LastPageIcon
+                                }}
+                                sx={{
+                                  minWidth: 0,
+                                  px: 0.5,
+                                  '&.MuiPaginationItem-root': { color: 'text.secondary' },
+                                  '&.MuiPaginationItem-root.Mui-selected': { bgcolor: 'primary.main', color: '#fff' },
+                                  '& .MuiSvgIcon-root': { fontSize: 16, opacity: 0.6 }
+                                }}
+                              />
+                            )}
+                          />
+
+                          {/* total count kept */}
+                          <Typography variant="body2" sx={{ color: 'text.secondary' }}>{totalRecords} images</Typography>
                         </Box>
                       </Box>
                     </Box>

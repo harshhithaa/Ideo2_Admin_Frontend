@@ -70,6 +70,7 @@ const PlaylistListResults = (props) => {
   const [showPreviewModal, setshowPreviewModal] = useState(false);
   const [allchecked, setall] = useState(false);
   const [Media, setMedia] = useState([]);
+  const [previewTitle, setPreviewTitle] = useState('');
 
   const handleSelectAll = (event) => {
     let newSelectedPlaylistRefs;
@@ -129,7 +130,7 @@ const PlaylistListResults = (props) => {
       {/* constrain inner area so page stays static; inner area scrolls */}
       <PerfectScrollbar style={{ maxHeight: '60vh' }}>
         <Box sx={{ width: '100%', overflowY: 'auto', overflowX: 'hidden' }}>
-          {showPreviewModal && <PreviewModal Media={Media} />}
+          {showPreviewModal && <PreviewModal Media={Media} title={previewTitle} />}
 
           {/* Table: ensure proper opening and closing tags */}
           <Table sx={{ tableLayout: 'fixed', '& th, & td': { fontSize: '0.95rem' } }}>
@@ -365,6 +366,7 @@ const PlaylistListResults = (props) => {
                             }}
                             onClick={() => {
                               setMedia(Playlist.Media);
+                              setPreviewTitle(Playlist.Name || '');
                               handlePlaylistPreview();
                             }}
                           >

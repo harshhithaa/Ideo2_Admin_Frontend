@@ -27,7 +27,7 @@ const modalStyle = {
   outline: "none",
 };
 
-export default function PreviewModal({ Media }) {
+export default function PreviewModal({ Media, title }) {
   const theme = useTheme();
   const [open, setOpen] = useState(true);
   const [activeStep, setActiveStep] = useState(0);
@@ -272,7 +272,7 @@ export default function PreviewModal({ Media }) {
           }}
         >
           <Typography variant="h6" fontWeight={600}>
-            Playlist Preview
+            {title || 'Playlist Preview'}
           </Typography>
 
           <ToggleButtonGroup
