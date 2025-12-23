@@ -190,7 +190,7 @@ const PlaylistListResults = (props) => {
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
                     padding: '16px',
-                    width: '20%'
+                    width: '18%'
                   }}
                 >
                   Description
@@ -205,12 +205,12 @@ const PlaylistListResults = (props) => {
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
                     padding: '16px',
-                    width: '12%'
+                    width: '10%'
                   }}
                 >
                   Preview
                 </TableCell>
-
+                
                 {/* Replaced single Creation Date column with two columns: CREATION DATE and TIME */}
                 <TableCell
                   align="center"
@@ -236,10 +236,10 @@ const PlaylistListResults = (props) => {
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
                     padding: '16px',
-                    width: '10%'
+                    width: '12%'
                   }}
                 >
-                  Time
+                  CREATION TIME
                 </TableCell>
 
                 <TableCell
@@ -338,7 +338,7 @@ const PlaylistListResults = (props) => {
                             cursor: 'pointer',
                             color: '#666',
                             fontSize: '0.9rem',
-                            width: '20%',
+                            width: '18%',
                             '&:hover': {
                               backgroundColor: '#fafafa'
                             }
@@ -351,7 +351,7 @@ const PlaylistListResults = (props) => {
 
                         <TableCell
                           align="center"
-                          sx={{ padding: '16px', width: '12%' }}
+                          sx={{ padding: '16px', width: '10%' }}
                         >
                           <Button
                             sx={{
@@ -396,7 +396,7 @@ const PlaylistListResults = (props) => {
                             padding: '16px',
                             color: '#999',
                             fontSize: '0.9rem',
-                            width: '10%'
+                            width: '12%'
                           }}
                         >
                           {creation.time}
