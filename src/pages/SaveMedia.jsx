@@ -316,6 +316,12 @@ function SaveMedia(props) {
       return;
     }
 
+    // Check for large files and warn user
+    const largeFiles = files.filter(f => f.size > 500 * 1024 * 1024); // 500MB
+    if (largeFiles.length > 0) {
+      console.log(`⚠️ Uploading ${largeFiles.length} large file(s). This may take several minutes...`);
+    }
+
     // ✅ Build placeholder metadata with correct media types
     const placeholders = files.map((f) => {
       const fileName = f.name || '';
@@ -368,11 +374,16 @@ function SaveMedia(props) {
     props.saveMedia(formdata, (err, progressEvent) => {
       if (progressEvent) {
         const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-        setUploadProgress(percent);
+        
+        // ✅ Only log every 20% to reduce console spam
+        if (percent % 20 === 0 || percent === 100) {
+          setUploadProgress(percent);
+        }
 
         if (percent === 100 && !uploadedLocallyRef.current) {
           uploadedLocallyRef.current = true;
-
+          console.log('✅ Upload complete');
+          
           setUploading(false);
           setUploadProgress(100);
           setSnackSeverity('success');

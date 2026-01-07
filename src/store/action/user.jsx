@@ -420,8 +420,13 @@ export const saveMedia = (data, callback) => async (dispatch) => {
         Accept: 'application/json',
         AuthToken: token
       },
+      timeout: 600000, // 10 minutes for large uploads
       onUploadProgress: (progressEvent) => {
         if (progressEvent && progressEvent.lengthComputable) {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          console.log(`Upload Progress: ${percentCompleted}%`);
           if (typeof callback === 'function') callback(null, progressEvent);
         }
       }
