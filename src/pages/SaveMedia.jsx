@@ -150,8 +150,14 @@ function SaveMedia(props) {
   const navigate = useNavigate();
 
   const uploadedLocallyRef = useRef(false);
-  // ✅ Store uploaded media type to pass to Media List
   const uploadedMediaTypeRef = useRef(null);
+  
+  // ✅ ADDED: Ref to track last logged progress (avoid console spam)
+  const lastLoggedProgressRef = useRef(0);
+
+  // Add constants at the top of the file (after imports)
+  const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB in bytes
+  const MAX_FILE_SIZE_MB = 2048; // For display
 
   const {
     getRootProps,
@@ -162,8 +168,51 @@ function SaveMedia(props) {
   } = useDropzone({
     accept: { 'image/*': [], 'video/*': [] },
     multiple: true,
-    onDrop: async (acceptedFiles) => {
+    maxSize: MAX_FILE_SIZE, // ✅ ADDED: Dropzone will reject files > 2GB
+    onDrop: async (acceptedFiles, rejectedFiles) => {
+      // ✅ ADDED: Handle rejected files (size/type validation failures)
+      if (rejectedFiles && rejectedFiles.length > 0) {
+        const oversizedFiles = rejectedFiles.filter(f => 
+          f.errors.some(e => e.code === 'file-too-large')
+        );
+
+        if (oversizedFiles.length > 0) {
+          const fileNames = oversizedFiles.map(f => f.file.name).join(', ');
+          setSnackSeverity('error');
+          setSnackMessage(
+            `The following files exceed the 2GB limit and cannot be uploaded: ${fileNames}`
+          );
+          setOpenSnackbar(true);
+          return;
+        }
+
+        // Handle other rejections (invalid file type, etc.)
+        const invalidTypeFiles = rejectedFiles.filter(f =>
+          f.errors.some(e => e.code === 'file-invalid-type')
+        );
+
+        if (invalidTypeFiles.length > 0) {
+          const fileNames = invalidTypeFiles.map(f => f.file.name).join(', ');
+          setSnackSeverity('error');
+          setSnackMessage(`Invalid file type: ${fileNames}`);
+          setOpenSnackbar(true);
+          return;
+        }
+      }
+
       if (!acceptedFiles || acceptedFiles.length === 0) return;
+
+      // ✅ ADDED: Double-check file sizes before processing (defense in depth)
+      const oversized = acceptedFiles.filter(f => f.size > MAX_FILE_SIZE);
+      if (oversized.length > 0) {
+        const names = oversized.map(f => f.name).join(', ');
+        setSnackSeverity('error');
+        setSnackMessage(
+          `Files exceed 2GB limit: ${names}. Please select smaller files.`
+        );
+        setOpenSnackbar(true);
+        return;
+      }
 
       const processed = await Promise.all(
         acceptedFiles.map(async (file) => {
@@ -228,6 +277,15 @@ function SaveMedia(props) {
     });
   };
 
+  // ✅ HELPER FUNCTION TO FORMAT FILE SIZE FOR DISPLAY
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
   const thumbs = files.map((f) => (
     <div key={`${f.name}_${f.size}`} style={thumb}>
       <button
@@ -260,7 +318,31 @@ function SaveMedia(props) {
         <img src={f.preview} style={imgStyle} alt={f.name} />
       </div>
 
-      <div style={{ position: 'absolute', bottom: -18, left: 0, width: '100%', textAlign: 'center', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      {/* ✅ ADDED: File size badge */}
+      <div style={{
+        position: 'absolute',
+        bottom: 14,
+        right: 4,
+        background: 'rgba(0,0,0,0.7)',
+        color: '#fff',
+        padding: '2px 6px',
+        borderRadius: 3,
+        fontSize: 9,
+        fontWeight: 600
+      }}>
+        {formatFileSize(f.size)}
+      </div>
+
+      <div style={{ 
+        position: 'absolute', 
+        bottom: -18, 
+        left: 0, 
+        width: '100%', 
+        textAlign: 'center', 
+        fontSize: 11, 
+        overflow: 'hidden', 
+        textOverflow: 'ellipsis' 
+      }}>
         {f.name}
       </div>
     </div>
@@ -316,19 +398,25 @@ function SaveMedia(props) {
       return;
     }
 
-    // Check for large files and warn user
-    const largeFiles = files.filter(f => f.size > 500 * 1024 * 1024); // 500MB
+    const oversized = files.filter(f => f.size > MAX_FILE_SIZE);
+    if (oversized.length > 0) {
+      const names = oversized.map(f => f.name).join(', ');
+      setSnackSeverity('error');
+      setSnackMessage(`Cannot upload files larger than 2GB: ${names}`);
+      setOpenSnackbar(true);
+      return;
+    }
+
+    const largeFiles = files.filter(f => f.size > 500 * 1024 * 1024 && f.size <= MAX_FILE_SIZE);
     if (largeFiles.length > 0) {
       console.log(`⚠️ Uploading ${largeFiles.length} large file(s). This may take several minutes...`);
     }
 
-    // ✅ Build placeholder metadata with correct media types
     const placeholders = files.map((f) => {
       const fileName = f.name || '';
       const fileType = (f.type || '').toLowerCase();
       
-      // Determine media type based on file extension and MIME type
-      let mediaType = 'image'; // default
+      let mediaType = 'image';
       
       if (fileType.includes('gif') || fileName.toLowerCase().endsWith('.gif')) {
         mediaType = 'gif';
@@ -347,21 +435,18 @@ function SaveMedia(props) {
       };
     });
 
-    // ✅ CLEAR ANY EXISTING PLACEHOLDERS BEFORE SAVING NEW ONES
     try {
       localStorage.removeItem('IDEOGRAM_UPLOADED_MEDIA');
     } catch (e) {
       console.error('Error clearing old placeholders:', e);
     }
 
-    // Store NEW placeholders in localStorage
     try {
       localStorage.setItem('IDEOGRAM_UPLOADED_MEDIA', JSON.stringify(placeholders));
     } catch (e) {
       console.error('Error saving placeholders to localStorage:', e);
     }
 
-    // ✅ Determine and store media type before upload
     uploadedMediaTypeRef.current = determineUploadedMediaType();
 
     const formdata = new FormData();
@@ -370,19 +455,26 @@ function SaveMedia(props) {
     setUploading(true);
     setUploadProgress(0);
     uploadedLocallyRef.current = false;
+    lastLoggedProgressRef.current = 0; // ✅ Reset last logged progress
 
     props.saveMedia(formdata, (err, progressEvent) => {
+      // ✅ IMPROVED: Handle progress events with smooth updates
       if (progressEvent) {
         const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
         
-        // ✅ Only log every 20% to reduce console spam
-        if (percent % 20 === 0 || percent === 100) {
-          setUploadProgress(percent);
+        // ✅ ALWAYS update state (React will batch efficiently)
+        setUploadProgress(percent);
+
+        // ✅ Log only at 5% intervals to reduce console spam while showing more granular updates
+        if (percent - lastLoggedProgressRef.current >= 5 || percent === 100) {
+          console.log(`📤 Upload Progress: ${percent}%`);
+          lastLoggedProgressRef.current = percent;
         }
 
+        // ✅ Detect completion
         if (percent === 100 && !uploadedLocallyRef.current) {
           uploadedLocallyRef.current = true;
-          console.log('✅ Upload complete');
+          console.log('✅ Upload complete - files transferred to server');
           
           setUploading(false);
           setUploadProgress(100);
@@ -400,6 +492,7 @@ function SaveMedia(props) {
         return;
       }
 
+      // ✅ Handle completion callback (non-progress event)
       if (uploadedLocallyRef.current) {
         uploadedLocallyRef.current = false;
         return;
@@ -409,8 +502,17 @@ function SaveMedia(props) {
       setUploadProgress(0);
 
       if (err?.exists) {
+        const errorMsg = err.err || err.errmessage || 'Upload failed';
+        const isSizeError = errorMsg.toLowerCase().includes('size') || 
+                            errorMsg.toLowerCase().includes('large') ||
+                            errorMsg.toLowerCase().includes('limit');
+        
         setSnackSeverity('error');
-        setSnackMessage(err.err || 'Upload failed');
+        setSnackMessage(
+          isSizeError 
+            ? `File too large. Maximum size is 2GB per file.` 
+            : errorMsg
+        );
         setOpenSnackbar(true);
       } else {
         setSnackSeverity('success');

@@ -475,7 +475,31 @@ export const saveMedia = (data, callback) => async (dispatch) => {
       if (typeof callback === 'function') callback({ exists: true, err: res.data.Error.ErrorMessage || 'Upload failed' });
     }
   } catch (err) {
-    if (typeof callback === 'function') callback({ exists: true, err: err.message || err });
+    // ✅ ENHANCED ERROR HANDLING
+    let errorMessage = 'Upload failed';
+    
+    if (err.response) {
+      // Backend returned error response
+      if (err.response.status === 413) {
+        errorMessage = 'File too large. Maximum file size is 2GB per file.';
+      } else if (err.response.status === 415) {
+        errorMessage = 'Unsupported file type. Only images and videos are allowed.';
+      } else if (err.response.data && err.response.data.Error) {
+        errorMessage = err.response.data.Error.ErrorDescription || 
+                      err.response.data.Error.ErrorMessage || 
+                      errorMessage;
+      }
+    } else if (err.request) {
+      // Network error (no response received)
+      errorMessage = 'Network error. Please check your connection and try again.';
+    } else {
+      // Client-side error
+      errorMessage = err.message || errorMessage;
+    }
+    
+    if (typeof callback === 'function') {
+      callback({ exists: true, err: errorMessage });
+    }
   }
 };
 
