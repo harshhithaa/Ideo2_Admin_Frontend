@@ -144,6 +144,29 @@ const SaveMonitorDetails = (props) => {
     }
   }, []);
 
+  // Add this helper function near the top of the component, after the state declarations
+const formatDateForDisplay = (dateStr) => {
+  if (!dateStr) return '';
+  
+  // Handle YYYY-MM-DD format
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const [year, month, day] = parts;
+    return `${day}-${month}-${year}`;
+  }
+  
+  // Fallback: try to parse as Date
+  try {
+    const date = new Date(dateStr);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  } catch {
+    return dateStr;
+  }
+};
+
   // ==================== ADD CONFLICT DETECTION FUNCTIONS ====================
   
   // Convert time string (HH:MM) to minutes since midnight
@@ -772,27 +795,28 @@ const SaveMonitorDetails = (props) => {
                             {selectedScheduleObjects && selectedScheduleObjects.length > 0 ? (
                               selectedScheduleObjects.map((value, index) => (
                                 <div key={index} style={{ width: '90%' }}>
-                                  <Chip
-                                    label={`${value.Title} (${value.StartTime || ''} - ${value.EndTime || ''}) (${value.StartDate || ''} - ${value.EndDate || ''})`}
-                                    sx={{
-                                      margin: 0.5,
-                                      width: '100%',
-                                      boxSizing: 'border-box',
-                                      overflow: 'hidden',
-                                      whiteSpace: 'nowrap',
-                                      textOverflow: 'ellipsis',
-                                      position: 'relative',
-                                      '& .MuiChip-label': {
-                                        fontSize: '1rem',
-                                        fontWeight: 400,
-                                        fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-                                        lineHeight: 1.5,
-                                        letterSpacing: '0.00938em',
-                                        color: 'rgba(0, 0, 0, 0.87)',
-                                        padding: '6px 12px'
-                                      }
-                                    }}
-                                  />
+                                    
+<Chip
+  label={`${value.Title} (${value.StartTime || ''} - ${value.EndTime || ''}) (${formatDateForDisplay(value.StartDate)} - ${formatDateForDisplay(value.EndDate)})`}
+  sx={{
+    margin: 0.5,
+    width: '100%',
+    boxSizing: 'border-box',
+    overflow: 'hidden',
+    whiteSpace: 'nowrap',
+    textOverflow: 'ellipsis',
+    position: 'relative',
+    '& .MuiChip-label': {
+      fontSize: '1rem',
+      fontWeight: 400,
+      fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+      lineHeight: 1.5,
+      letterSpacing: '0.00938em',
+      color: 'rgba(0, 0, 0, 0.87)',
+      padding: '6px 12px'
+    }
+  }}
+/>
                                 </div>
                               ))
                             ) : (
@@ -838,26 +862,26 @@ const SaveMonitorDetails = (props) => {
                                 const value = selectedScheduleObjects.find((s) => s.ScheduleRef === ref) || { ScheduleRef: ref, Title: ref };
                                 return (
                                   <div key={index} style={{ width: '90%' }}>
-                                    <Chip
-                                      label={`${value.Title} (${value.StartTime || ''} - ${value.EndTime || ''}) (${value.StartDate || ''} - ${value.EndDate || ''})`}
-                                      style={{
-                                        margin: 2,
-                                        width: '100%',
-                                        boxSizing: 'border-box',
-                                        overflow: 'hidden',
-                                        whiteSpace: 'nowrap',
-                                        textOverflow: 'ellipsis',
-                                        position: 'relative'
-                                      }}
-                                      clickable
-                                      onDelete={(e) => handleRemoveSchedule(e, value)}
-                                      deleteIcon={
-                                        <CancelRounded
-                                          style={{ position: 'absolute', right: 8 }}
-                                          onMouseDown={(event) => event.stopPropagation()}
-                                        />
-                                      }
-                                    />
+<Chip
+  label={`${value.Title} (${value.StartTime || ''} - ${value.EndTime || ''}) (${formatDateForDisplay(value.StartDate)} - ${formatDateForDisplay(value.EndDate)})`}
+  style={{
+    margin: 2,
+    width: '100%',
+    boxSizing: 'border-box',
+    overflow: 'hidden',
+    whiteSpace: 'nowrap',
+    textOverflow: 'ellipsis',
+    position: 'relative'
+  }}
+  clickable
+  onDelete={(e) => handleRemoveSchedule(e, value)}
+  deleteIcon={
+    <CancelRounded
+      style={{ position: 'absolute', right: 8 }}
+      onMouseDown={(event) => event.stopPropagation()}
+    />
+  }
+/>
                                   </div>
                                 );
                               })}

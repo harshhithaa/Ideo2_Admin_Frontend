@@ -395,15 +395,24 @@ const MonitorListResults = (props) => {
             <Typography variant="caption" sx={{ display: 'block', fontWeight: 600, color: '#f44336' }}>
               {errors.some(e => e.severity === 'error') ? 'Errors:' : 'Warnings:'}
             </Typography>
-            {errors.map((error, idx) => (
-              <Typography key={idx} variant="caption" sx={{ 
-                display: 'block', 
-                fontSize: '0.7rem', 
-                color: error.severity === 'error' ? '#f44336' : '#ff9800'
-              }}>
-                {error.severity === 'error' ? '❌' : '⚠️'} {error.message || error.type}
-              </Typography>
-            ))}
+            {errors.map((error, idx) => {
+              // ✅ CHANGE THIS LINE - Replace "An Application Error Has Occurred" with "Reconnecting to Internet"
+              const displayMessage = error.message === 'An Application Error Has Occurred' 
+                ? 'Reconnecting to Internet'
+                : (error.type === 'reconnecting' || error.message?.includes('Reconnecting')) 
+                  ? 'Reconnecting to Internet' 
+                  : (error.message || error.type);
+              
+              return (
+                <Typography key={idx} variant="caption" sx={{ 
+                  display: 'block', 
+                  fontSize: '0.7rem', 
+                  color: error.severity === 'error' ? '#f44336' : '#ff9800'
+                }}>
+                  {error.severity === 'error' ? '❌' : '⚠️'} {displayMessage}
+                </Typography>
+              );
+            })}
           </Box>
         )}
       </Box>
@@ -762,12 +771,12 @@ const MonitorListResults = (props) => {
                   Monitor Name
                 </TableCell>
 
-                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '20%' }}>
+                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '12%' }}>
                   Description
                 </TableCell>
 
                 <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '15%' }}>
-                  Schedule Names
+                  Schedule Name
                 </TableCell>
 
                 <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '15%' }}>
@@ -775,7 +784,7 @@ const MonitorListResults = (props) => {
                 </TableCell>
 
                 <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '12%' }}>
-                  Status (Playlist Name)
+                  Status <br />(Playlist Name)
                 </TableCell>
 
                 <TableCell align="center" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '8%' }}>

@@ -145,10 +145,10 @@ const ScheduleListResults = ({ Schedules = [], setselected, search = '', view, e
         <Card {...rest} sx={{ boxShadow: 2 }}>
             {/* keep table responsive: no horizontal scroll, internal vertical scroll only */}
             <Box sx={{ width: '100%', maxHeight: '60vh', overflowY: 'auto', overflowX: 'hidden' }}>
-                <Table stickyHeader sx={{ tableLayout: 'fixed', '& th, & td': { fontSize: '0.95rem' } }}>
+                <Table stickyHeader sx={{ tableLayout: 'fixed', width: '100%', '& th, & td': { fontSize: '0.95rem' } }}>
                     <TableHead>
                         <TableRow>
-                            <TableCell padding="checkbox" sx={{ width: 60 }} align="left">
+                            <TableCell padding="checkbox" sx={{ width: '8%' }} align="left">
                                 <Checkbox
                                     color="primary"
                                     checked={selectedIds.length === Schedules.length && Schedules.length > 0}
@@ -156,18 +156,12 @@ const ScheduleListResults = ({ Schedules = [], setselected, search = '', view, e
                                     onChange={handleSelectAll}
                                 />
                             </TableCell>
-                            <TableCell sx={{ fontWeight: 700, width: 220, fontSize: '0.95rem' }}>SCHEDULE TITLE</TableCell>
-                            <TableCell sx={{ fontWeight: 700, width: 220, fontSize: '0.95rem' }}>DESCRIPTION</TableCell>
-                            <TableCell sx={{ fontWeight: 700, width: 200, fontSize: '0.95rem' }}>ASSIGNED PLAYLIST</TableCell>
-
-                            {/* 
-                            // STATUS column disabled per request — commented out instead of deleted
-                            <TableCell sx={{ fontWeight: 700, width: 140 }}>STATUS</TableCell>
-                            */}
-
-                            <TableCell sx={{ fontWeight: 700, width: 160 }}>CREATION DATE</TableCell>
-                            <TableCell sx={{ fontWeight: 700, width: 120 }}>TIME</TableCell>
-                            <TableCell sx={{ fontWeight: 700,width: 80, textAlign: 'center' }}>EDIT</TableCell>
+                            <TableCell sx={{ fontWeight: 700, width: '15%', fontSize: '0.95rem' }}>SCHEDULE TITLE</TableCell>
+                            <TableCell sx={{ fontWeight: 700, width: '15%', fontSize: '0.95rem' }}>DESCRIPTION</TableCell>
+                            <TableCell sx={{ fontWeight: 700, width: '20%', fontSize: '0.95rem' }}>ASSIGNED PLAYLIST</TableCell>
+                            <TableCell sx={{ fontWeight: 700, width: '14%', fontSize: '0.95rem' }}>CREATION DATE</TableCell>
+                            <TableCell sx={{ fontWeight: 700, width: '16%', fontSize: '0.95rem' }}>CREATION TIME</TableCell>
+                            <TableCell sx={{ fontWeight: 700, width: '6%', textAlign: 'center', fontSize: '0.95rem' }}>EDIT</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -190,7 +184,7 @@ const ScheduleListResults = ({ Schedules = [], setselected, search = '', view, e
 
                                 return (
                                     <TableRow hover key={id} selected={selectedIds.indexOf(id) !== -1}>
-                                        <TableCell padding="checkbox">
+                                        <TableCell padding="checkbox" sx={{ width: '8%' }}>
                                             <Checkbox
                                                 color="primary"
                                                 checked={selectedIds.indexOf(id) !== -1}
@@ -198,42 +192,32 @@ const ScheduleListResults = ({ Schedules = [], setselected, search = '', view, e
                                                 value={selectedIds.indexOf(id) !== -1}
                                             />
                                         </TableCell>
-                                        <TableCell sx={{ pl: 2 }}>
+                                        <TableCell sx={{ pl: 2, width: '20%' }}>
                                             <Typography variant="subtitle2" noWrap sx={{ fontWeight: 500, fontSize: '0.95rem' }}>
                                                 {schedule.Title || schedule.title || '-'}
                                             </Typography>
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell sx={{ width: '22%' }}>
                                             <Typography variant="body2" color="textSecondary" noWrap sx={{ fontSize: '0.95rem' }}>
                                                 {schedule.Description || schedule.description || '-'}
                                             </Typography>
                                         </TableCell>
-                                        <TableCell>
-                                            <Typography variant="body2" color="textSecondary" noWrap>
+                                        <TableCell sx={{ width: '20%' }}>
+                                            <Typography variant="body2" color="textSecondary" noWrap sx={{ fontSize: '0.95rem' }}>
                                                 {playlistName}
                                             </Typography>
                                         </TableCell>
-
-                                        {/*
-                                         STATUS column commented out — kept here intentionally in comments to preserve original logic
-                                         Example original logic might have been:
-                                         const statusLabel = schedule.Status === 'Active' ? 'Active' : 'Inactive';
-                                         <TableCell>
-                                             <Chip label={statusLabel} color={statusLabel === 'Active' ? 'success' : 'default'} />
-                                         </TableCell>
-                                        */}
-
-                                        <TableCell>
-                                            <Typography variant="body2" noWrap>
+                                        <TableCell sx={{ width: '14%' }}>
+                                            <Typography variant="body2" noWrap sx={{ fontSize: '0.95rem' }}>
                                                 {creation.date}
                                             </Typography>
                                         </TableCell>
-                                        <TableCell>
-                                            <Typography variant="body2" noWrap>
+                                        <TableCell sx={{ width: '10%' }}>
+                                            <Typography variant="body2" noWrap sx={{ fontSize: '0.95rem' }}>
                                                 {creation.time}
                                             </Typography>
                                         </TableCell>
-                                        <TableCell align="center">
+                                        <TableCell align="center" sx={{ width: '6%' }}>
                                             <IconButton
                                                 color="primary"
                                                 onClick={() => editcall && editcall(schedule)}
