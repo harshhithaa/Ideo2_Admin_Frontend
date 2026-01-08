@@ -227,9 +227,49 @@ const MonitorListResults = (props) => {
       );
     }
 
-    // Check online/offline FIRST
+    // ✅ NEW: Check for specific error types FIRST
+    const statusErrors = status.Errors || status.errors;
+    
+    // Check for "connection_lost" or "No Internet Connection" errors ONLY
+    const hasNetworkError = statusErrors && statusErrors.some(e => 
+      e.type === 'connection_lost' || 
+      e.message === 'No Internet Connection'
+    );
+
+    // ✅ Show "No Internet" ONLY if connection_lost error exists
+    if (hasNetworkError) {
+      return (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Chip 
+            label="No Internet"
+            size="small"
+            sx={{ 
+              bgcolor: '#fff3e0',
+              color: '#e65100',
+              fontWeight: 600,
+              minWidth: '80px'
+            }}
+          />
+          <IconButton 
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRefreshStatus(monitor.MonitorRef);
+            }}
+            sx={{ padding: '4px' }}
+          >
+            <SvgIcon fontSize="small">
+              <RefreshIcon />
+            </SvgIcon>
+          </IconButton>
+        </Box>
+      );
+    }
+
+    // ✅ Check online/offline status
     const isOnline = status.Status === 'online';
 
+    // ✅ Show "Offline" for: no_data errors, or Status === 'offline' without connection_lost
     if (!isOnline) {
       return (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
