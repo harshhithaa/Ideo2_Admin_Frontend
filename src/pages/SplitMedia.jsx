@@ -577,13 +577,17 @@ const SplitScreenApp = () => {
     const filesToAdd = files.slice(0, canAdd);
 
     filesToAdd.forEach((file) => {
-      if (file.type.indexOf("image/") === 0) {
+      // ✅ ONLY ALLOW STATIC IMAGE FORMATS (exclude GIF and video)
+      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/bmp"];
+      if (allowedTypes.includes(file.type.toLowerCase())) {
         const reader = new FileReader();
         reader.onload = (event) => {
           const id = Math.random().toString(36).substr(2, 9);
           setUploadedImages((prev) => [...prev, { id, src: event.target.result }]);
         };
         reader.readAsDataURL(file);
+      } else {
+        alert(`File "${file.name}" is not supported. Only JPEG, PNG, WEBP, and BMP images are allowed.`);
       }
     });
 
@@ -797,7 +801,7 @@ const SplitScreenApp = () => {
                 id="file-upload"
                 type="file"
                 multiple
-                accept="image/*"
+                accept="image/jpeg,image/jpg,image/png,image/webp,image/bmp"
                 onChange={handleFileUpload}
                 style={{ display: "none" }}
               />
