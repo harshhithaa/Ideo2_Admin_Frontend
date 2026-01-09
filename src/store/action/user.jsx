@@ -370,49 +370,12 @@ export const logoutUser = (callback) => (dispatch) => {
   }
 };
 
-export const saveMedia = (data, callback) => async (dispatch) => {
+export const saveMedia = (data, abortSignal, callback) => async (dispatch) => {
   const token = store.getState().root.user.accesstoken;
 
   try {
-    // --- NEW: create immediate placeholders from FormData files before upload ---
-    try {
-      const key = 'IDEOGRAM_UPLOADED_MEDIA';
-      const existingRaw = localStorage.getItem(key);
-      const existing = existingRaw ? JSON.parse(existingRaw) : [];
-
-      const files = [];
-      if (data instanceof FormData) {
-        for (const pair of data.entries()) {
-          const v = pair[1];
-          if (v instanceof File) files.push(v);
-          else if (Array.isArray(v) && v.length && v[0] instanceof File) files.push(...v);
-        }
-      }
-
-      const placeholders = files.map((file) => {
-        const tmpRef = `tmp_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
-        const url = URL.createObjectURL(file);
-        // revoke after 60s to avoid memory leak
-        setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 60000);
-        return {
-          MediaRef: tmpRef,
-          fileName: file.name,
-          fileMimetype: (file.type && file.type.split('/')[0]) || 'file',
-          fileUrl: url,
-          isProcessing: true,
-          createdAt: new Date().toISOString()
-        };
-      });
-
-      if (placeholders.length) {
-        // merge with existing placeholders (keep newest first) and dedupe by MediaRef
-        const map = new Map();
-        placeholders.concat(existing).forEach((it) => { if (!map.has(it.MediaRef)) map.set(it.MediaRef, it); });
-        localStorage.setItem(key, JSON.stringify(Array.from(map.values())));
-      }
-    } catch (e) {
-      console.warn('pre-upload placeholder write failed', e);
-    }
+    // ✅ REMOVED: Don't create placeholders here - SaveMedia.jsx already handles this
+    // The localStorage placeholders are already created in SaveMedia.jsx before upload starts
 
     const res = await Api.post('/admin/savemedia', data, {
       headers: {
@@ -420,7 +383,8 @@ export const saveMedia = (data, callback) => async (dispatch) => {
         Accept: 'application/json',
         AuthToken: token
       },
-      timeout: 600000, // 10 minutes for large uploads
+      timeout: 600000,
+      signal: abortSignal,
       onUploadProgress: (progressEvent) => {
         if (progressEvent && progressEvent.lengthComputable) {
           const percentCompleted = Math.round(
@@ -435,51 +399,36 @@ export const saveMedia = (data, callback) => async (dispatch) => {
     if (!res.data.Error) {
       const uploadedMedia = res.data.Details && res.data.Details.Media ? res.data.Details.Media : [];
 
-      // --- remove temp placeholders (existing) ---
+      // Clear ALL placeholders immediately
       try {
-        const key = 'IDEOGRAM_UPLOADED_MEDIA';
-        const existingRaw = localStorage.getItem(key);
-        let existing = [];
-        if (existingRaw) {
-          existing = JSON.parse(existingRaw) || [];
-        }
-
-        const uploadedNames = new Set(
-          uploadedMedia.map((p) => (p.fileName || p.MediaName || '').toString())
-        );
-
-        const filtered = existing.filter((ph) => {
-          const name = (ph.fileName || ph.MediaName || '').toString();
-          return !uploadedNames.has(name);
-        });
-
-        localStorage.setItem(key, JSON.stringify(filtered));
+        localStorage.removeItem('IDEOGRAM_UPLOADED_MEDIA');
       } catch (e) {
-        console.warn('persist uploaded placeholder failed', e);
+        console.warn('Failed to clear placeholders', e);
       }
 
-      // --- NEW: notify UI that upload completed with server results ---
+      // Notify UI that upload completed with server results
       try {
-        window.dispatchEvent(new CustomEvent('ideogram:uploadComplete', { detail: { uploadedMedia } }));
+        window.dispatchEvent(new CustomEvent('ideogram:uploadComplete', { 
+          detail: { uploadedMedia } 
+        }));
       } catch (e) {
-        // ignore if window not available
+        console.error('Failed to dispatch upload complete event', e);
       }
-
-      // try to refresh list (best-effort)
-      try {
-        dispatch(getUserComponentList({ componenttype: COMPONENTS.Media }));
-      } catch (e) { /* ignore */ }
 
       if (typeof callback === 'function') callback(null, null, res.data.Details);
     } else {
       if (typeof callback === 'function') callback({ exists: true, err: res.data.Error.ErrorMessage || 'Upload failed' });
     }
   } catch (err) {
-    // ✅ ENHANCED ERROR HANDLING
+    // Handle abort error
+    if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+      console.log('Upload cancelled by user');
+      return;
+    }
+
     let errorMessage = 'Upload failed';
     
     if (err.response) {
-      // Backend returned error response
       if (err.response.status === 413) {
         errorMessage = 'File too large. Maximum file size is 2GB per file.';
       } else if (err.response.status === 415) {
@@ -490,10 +439,8 @@ export const saveMedia = (data, callback) => async (dispatch) => {
                       errorMessage;
       }
     } else if (err.request) {
-      // Network error (no response received)
       errorMessage = 'Network error. Please check your connection and try again.';
     } else {
-      // Client-side error
       errorMessage = err.message || errorMessage;
     }
     

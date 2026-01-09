@@ -146,14 +146,15 @@ function SaveMedia(props) {
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [snackSeverity, setSnackSeverity] = useState('success');
   const [snackMessage, setSnackMessage] = useState('');
+  const [openCancelDialog, setOpenCancelDialog] = useState(false); // ✅ ADDED
+  const [fileToRemove, setFileToRemove] = useState(null); // ✅ ADDED
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
   const uploadedLocallyRef = useRef(false);
   const uploadedMediaTypeRef = useRef(null);
-  
-  // ✅ ADDED: Ref to track last logged progress (avoid console spam)
   const lastLoggedProgressRef = useRef(0);
+  const abortControllerRef = useRef(null);
 
   // Add constants at the top of the file (after imports)
   const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB in bytes
@@ -272,9 +273,67 @@ function SaveMedia(props) {
         try { if (f.preview) URL.revokeObjectURL(f.preview); } catch (e) {}
         try { if (f.originalPreview) URL.revokeObjectURL(f.originalPreview); } catch (e) {}
       });
-      if (keep.length === 0) setDisableButton(true);
+      if (keep.length === 0) {
+        setDisableButton(true);
+        if (uploading && abortControllerRef.current) {
+          abortControllerRef.current.abort();
+          setUploading(false);
+          setUploadProgress(0);
+        }
+      }
       return keep;
     });
+  };
+
+  // ✅ ADDED: Handle remove click with confirmation if uploading
+  const handleRemoveClick = (name, size) => {
+    if (uploading) {
+      setFileToRemove({ name, size });
+      setOpenCancelDialog(true);
+    } else {
+      removeFile(name, size);
+    }
+  };
+
+  // ✅ ADDED: Confirm cancel upload
+  const handleConfirmCancel = () => {
+    // ✅ STEP 1: Clear placeholders from localStorage IMMEDIATELY
+    try {
+      localStorage.removeItem('IDEOGRAM_UPLOADED_MEDIA');
+      console.log('✅ Placeholders cleared from localStorage');
+    } catch (e) {
+      console.error('Error clearing placeholders:', e);
+    }
+
+    // ✅ STEP 2: Abort the upload
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      setUploading(false);
+      setUploadProgress(0);
+      abortControllerRef.current = null;
+      console.log('✅ Upload aborted');
+    }
+
+    // ✅ STEP 3: Remove the file
+    if (fileToRemove) {
+      removeFile(fileToRemove.name, fileToRemove.size);
+    }
+
+    // ✅ STEP 4: Dispatch event to notify MediaList to clear placeholders
+    try {
+      window.dispatchEvent(new CustomEvent('ideogram:uploadCanceled'));
+    } catch (e) {
+      console.error('Failed to dispatch cancel event', e);
+    }
+
+    setOpenCancelDialog(false);
+    setFileToRemove(null);
+  };
+
+  // ✅ ADDED: Cancel the cancel action
+  const handleCancelCancel = () => {
+    setOpenCancelDialog(false);
+    setFileToRemove(null);
   };
 
   // ✅ HELPER FUNCTION TO FORMAT FILE SIZE FOR DISPLAY
@@ -290,7 +349,10 @@ function SaveMedia(props) {
     <div key={`${f.name}_${f.size}`} style={thumb}>
       <button
         type="button"
-        onClick={(e) => { e.stopPropagation(); removeFile(f.name, f.size); }}
+        onClick={(e) => { 
+          e.stopPropagation(); 
+          handleRemoveClick(f.name, f.size); // ✅ CHANGED: Use handleRemoveClick instead of removeFile
+        }}
         aria-label={`Remove ${f.name}`}
         style={{
           position: 'absolute',
@@ -412,6 +474,7 @@ function SaveMedia(props) {
       console.log(`⚠️ Uploading ${largeFiles.length} large file(s). This may take several minutes...`);
     }
 
+    // ✅ CHANGED: Enhanced placeholders with original file blob URLs for instant preview
     const placeholders = files.map((f) => {
       const fileName = f.name || '';
       const fileType = (f.type || '').toLowerCase();
@@ -428,10 +491,13 @@ function SaveMedia(props) {
         MediaRef: `tmp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         fileName: fileName,
         fileUrl: f.preview || null,
+        Thumbnail: f.preview || null,
         fileMimetype: fileType,
         mediaType: mediaType,
         isProcessing: true,
-        processingProgress: 0
+        processingProgress: 0,
+        fileSize: f.size,
+        fileKey: `${fileName}_${f.size}_${f.file.lastModified}`
       };
     });
 
@@ -455,23 +521,20 @@ function SaveMedia(props) {
     setUploading(true);
     setUploadProgress(0);
     uploadedLocallyRef.current = false;
-    lastLoggedProgressRef.current = 0; // ✅ Reset last logged progress
+    lastLoggedProgressRef.current = 0;
+    abortControllerRef.current = new AbortController();
 
-    props.saveMedia(formdata, (err, progressEvent) => {
-      // ✅ IMPROVED: Handle progress events with smooth updates
+    props.saveMedia(formdata, abortControllerRef.current.signal, (err, progressEvent) => {
       if (progressEvent) {
         const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
         
-        // ✅ ALWAYS update state (React will batch efficiently)
         setUploadProgress(percent);
 
-        // ✅ Log only at 5% intervals to reduce console spam while showing more granular updates
         if (percent - lastLoggedProgressRef.current >= 5 || percent === 100) {
           console.log(`📤 Upload Progress: ${percent}%`);
           lastLoggedProgressRef.current = percent;
         }
 
-        // ✅ Detect completion
         if (percent === 100 && !uploadedLocallyRef.current) {
           uploadedLocallyRef.current = true;
           console.log('✅ Upload complete - files transferred to server');
@@ -488,11 +551,11 @@ function SaveMedia(props) {
           });
           setFiles([]);
           setDisableButton(true);
+          abortControllerRef.current = null;
         }
         return;
       }
 
-      // ✅ Handle completion callback (non-progress event)
       if (uploadedLocallyRef.current) {
         uploadedLocallyRef.current = false;
         return;
@@ -500,6 +563,17 @@ function SaveMedia(props) {
 
       setUploading(false);
       setUploadProgress(0);
+      abortControllerRef.current = null;
+
+      // ✅ ADDED: Clear placeholders on error or cancellation
+      if (err?.exists || err?.name === 'AbortError' || err?.name === 'CanceledError') {
+        try {
+          localStorage.removeItem('IDEOGRAM_UPLOADED_MEDIA');
+          window.dispatchEvent(new CustomEvent('ideogram:uploadCanceled'));
+        } catch (e) {
+          console.error('Error clearing placeholders:', e);
+        }
+      }
 
       if (err?.exists) {
         const errorMsg = err.err || err.errmessage || 'Upload failed';
@@ -513,6 +587,11 @@ function SaveMedia(props) {
             ? `File too large. Maximum size is 2GB per file.` 
             : errorMsg
         );
+        setOpenSnackbar(true);
+      } else if (err?.name === 'AbortError' || err?.name === 'CanceledError') {
+        console.log('Upload canceled by user');
+        setSnackSeverity('info');
+        setSnackMessage('Upload canceled');
         setOpenSnackbar(true);
       } else {
         setSnackSeverity('success');
@@ -546,6 +625,24 @@ function SaveMedia(props) {
           ADD MEDIA
         </h1>
       </div>
+
+      {/* ✅ ADDED: Cancel Upload Confirmation Dialog */}
+      <Dialog open={openCancelDialog} onClose={handleCancelCancel}>
+        <DialogTitle>Cancel Upload?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Do you want to cancel the ongoing upload? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelCancel} color="primary">
+            No
+          </Button>
+          <Button onClick={handleConfirmCancel} color="error" variant="contained">
+            Yes, Cancel Upload
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={openSnackbar}
@@ -645,7 +742,7 @@ function SaveMedia(props) {
 }
 
 const mapDispatchToProps = (dispatch) => ({
-  saveMedia: (data, callback) => dispatch(saveMedia(data, callback))
+  saveMedia: (data, abortSignal, callback) => dispatch(saveMedia(data, abortSignal, callback))
 });
 
 export default connect(null, mapDispatchToProps)(SaveMedia);

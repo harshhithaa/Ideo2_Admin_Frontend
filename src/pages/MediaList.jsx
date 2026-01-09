@@ -520,65 +520,12 @@ const MediaList = (props) => {
     setselected(newSelected);
   };
 
-  // Poll for a single media Ref until DB returns actual record, then replace placeholder
-  const pollForMedia = async (mediaRef, attemptsLeft = POLL_MAX_ATTEMPTS) => {
-    if (!mediaRef || attemptsLeft <= 0) {
-      // give up
-      return;
-    }
-    try {
-      // Let Api client handle auth headers (avoid direct store import here)
-      const resp = await Api.get('/admin/fetchmedia', {
-        params: { MediaRef: mediaRef }
-      });
-      if (!resp.data.Error && resp.data.Details) {
-        const serverItem = resp.data.Details;
-        // robust replace: match by MediaRef OR by name/path (covers tmp blobs)
-        setMedia((prev) => {
-          let list = Array.isArray(prev) ? prev.slice() : [];
-          const idx = list.findIndex((m) =>
-            m.MediaRef === mediaRef ||
-            (m.MediaRef && serverItem.MediaRef && m.MediaRef === serverItem.MediaRef) ||
-            (m.MediaName && serverItem.MediaName && m.MediaName === serverItem.MediaName) ||
-            (m.MediaPath && serverItem.MediaPath && m.MediaPath === serverItem.MediaPath)
-          );
-
-          if (idx !== -1) {
-            list[idx] = { ...serverItem };
-          } else {
-            // remove matching placeholders (same name/path) before inserting
-            list = list.filter((m) =>
-              !(m.isProcessing && ((m.MediaName && serverItem.MediaName && m.MediaName === serverItem.MediaName) ||
-                (m.MediaPath && serverItem.MediaPath && m.MediaPath === serverItem.MediaPath)))
-            );
-            list.unshift(serverItem);
-          }
-
-          return list;
-        });
-
-        // remove placeholder entries from ref (match by name/path or tmp ref)
-        placeholdersRef.current = (placeholdersRef.current || []).filter((p) =>
-          !(p.MediaRef === mediaRef ||
-            (p.MediaName && serverItem.MediaName && p.MediaName === serverItem.MediaName) ||
-            (p.MediaPath && serverItem.MediaPath && p.MediaPath === serverItem.MediaPath))
-        );
-        return;
-      }
-    } catch (err) {
-      // ignore transient errors and try again
-    }
-    // schedule next try
-    setTimeout(() => pollForMedia(mediaRef, attemptsLeft - 1), POLL_INTERVAL_MS);
-  };
-
   // -------------------------
   // Placeholder handling: read persisted placeholders once on mount and keep in a ref.
   // This ensures placeholders are available immediately and merged with server results.
   // -------------------------
   const placeholdersRef = useRef([]);
   useEffect(() => {
-    // ✅ ADD GUARD: Prevent running multiple times
     if (placeholdersRef.current.length > 0) {
       console.warn('Placeholders already loaded, skipping duplicate read');
       return;
@@ -591,7 +538,6 @@ const MediaList = (props) => {
         if (Array.isArray(placeholders) && placeholders.length > 0) {
           console.log(`Loading ${placeholders.length} placeholders from localStorage`);
           
-          // Deduplicate by fileKey (fallback to MediaRef)
           const seen = new Set();
           const phItems = [];
           placeholders.forEach((p) => {
@@ -599,14 +545,13 @@ const MediaList = (props) => {
             if (fileKey && seen.has(fileKey)) return;
             if (fileKey) seen.add(fileKey);
 
-            // Determine media type from placeholder data
             let mediaType = 'image';
             const fileName = (p.fileName || '').toLowerCase();
             const mimeType = (p.fileMimetype || '').toLowerCase();
             
             if (mimeType.includes('gif') || fileName.endsWith('.gif')) {
               mediaType = 'gif';
-            } else if (mimeType.startsWith('video/') || fileName.match(/\.(mp4|mov|avi|mkv|webm|ogg)$/)) {
+            } else if (mimeType.includes('video') || fileName.match(/\.(mp4|mov|avi|mkv|webm|ogg)$/)) {
               mediaType = 'video';
             }
 
@@ -626,22 +571,14 @@ const MediaList = (props) => {
             });
           });
 
-          // Only store placeholders in the ref - do NOT setMedia here.
           placeholdersRef.current = phItems;
-
-          // Clear persisted placeholders IMMEDIATELY after reading
           localStorage.removeItem(UPLOADED_MEDIA_KEY);
-          
-          // Start polling each placeholder so they are replaced when available on server
-          phItems.forEach((it) => {
-            if (it.MediaRef) pollForMedia(it.MediaRef);
-          });
         }
       }
     } catch (e) {
       console.error('Error reading uploaded placeholder from localStorage', e);
     }
-  }, []); // run ONLY once on mount
+  }, []);
 
   // listen for upload progress events (update placeholders' processingProgress)
   useEffect(() => {
@@ -896,59 +833,63 @@ const MediaList = (props) => {
     const handler = (ev) => {
       const uploaded = ev?.detail?.uploadedMedia || [];
 
-      // Replace matching placeholders with server items (match by name or path) to avoid duplicates
+      // Clear placeholders from state
       if (uploaded.length > 0) {
         setMedia((prev) => {
           let list = Array.isArray(prev) ? prev.slice() : [];
-          uploaded.forEach((si) => {
-            const serverName = si.fileName || si.MediaName;
-            const serverPath = si.fileUrl || si.MediaPath;
-
-            // find existing entry by MediaRef OR by name/path (covers tmp placeholders)
-            const idx = list.findIndex((m) =>
-              m.MediaRef === si.MediaRef ||
-              (m.MediaName && serverName && m.MediaName === serverName) ||
-              (m.MediaPath && serverPath && m.MediaPath === serverPath)
-            );
-
-            const serverItem = {
-              ...si,
-              MediaName: serverName || si.MediaName,
-              MediaPath: serverPath || si.MediaPath,
-              MediaType: si.fileMimetype || si.MediaType
-            };
-
-            if (idx !== -1) {
-              list[idx] = serverItem;
-            } else {
-              // remove placeholders with same name/path then add server item on top
-              list = list.filter((m) =>
-                !(m.isProcessing && ((m.MediaName && serverName && m.MediaName === serverName) || (m.MediaPath && serverPath && m.MediaPath === serverPath)))
-              );
-              list.unshift(serverItem);
-            }
-          });
+          
+          // Remove ALL placeholders (isProcessing items)
+          list = list.filter(item => !item.isProcessing);
+          
           return list;
         });
 
-        // remove those placeholders from ref so poll won't keep them
-        placeholdersRef.current = (placeholdersRef.current || []).filter((p) =>
-          !uploaded.some((si) => {
-            const serverName = si.fileName || si.MediaName;
-            const serverPath = si.fileUrl || si.MediaPath;
-            return (p.MediaName && serverName && p.MediaName === serverName) || (p.MediaPath && serverPath && p.MediaPath === serverPath);
-          })
-        );
+        // Clear placeholders from ref
+        placeholdersRef.current = [];
       }
 
-      // also refresh counts / server data to stay consistent
+      // ✅ CHANGED: Immediately refresh the current tab's data from server
       const mediaType = activeTabToMediaType(activeTab);
-      fetchMediaList(getCurrentPage(), mediaType, searchQuery, { setDisplay: true }).catch(() => {});
+      
+      // Small delay to ensure backend has saved the records
+      setTimeout(() => {
+        fetchMediaList(1, mediaType, searchQuery, { setDisplay: true })
+          .then(() => {
+            console.log('✅ Media list refreshed after upload');
+          })
+          .catch((err) => {
+            console.error('Failed to refresh media list:', err);
+          });
+      }, 500); // 500ms delay to ensure DB write is complete
     };
 
     window.addEventListener('ideogram:uploadComplete', handler);
     return () => window.removeEventListener('ideogram:uploadComplete', handler);
-  }, [activeTab, imagePage, videoPage, gifPage, searchQuery]);
+  }, [activeTab, searchQuery]); // ✅ Dependencies updated
+
+  // ✅ ADDED: Listen for upload cancel event
+  useEffect(() => {
+    const handleCancel = () => {
+      // Clear placeholders immediately
+      placeholdersRef.current = [];
+      
+      // Clear from state
+      setMedia((prev) => {
+        return (prev || []).filter(item => !item.isProcessing);
+      });
+      
+      // Clear from localStorage
+      try {
+        localStorage.removeItem('IDEOGRAM_UPLOADED_MEDIA');
+        console.log('✅ Placeholders cleared after cancel');
+      } catch (e) {
+        console.error('Error clearing placeholders:', e);
+      }
+    };
+
+    window.addEventListener('ideogram:uploadCanceled', handleCancel);
+    return () => window.removeEventListener('ideogram:uploadCanceled', handleCancel);
+  }, []);
 
   return (
     <>
