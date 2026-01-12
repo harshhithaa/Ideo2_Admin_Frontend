@@ -241,7 +241,7 @@ const MonitorListResults = (props) => {
       return (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Chip 
-            label="No Internet"
+            label="TV Internet Disconnected"
             size="small"
             sx={{ 
               bgcolor: '#fff3e0',
@@ -807,15 +807,15 @@ const MonitorListResults = (props) => {
                   </Box>
                 </TableCell>
 
-                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '15%' }}>
+                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '12%' }}>
                   Monitor Name
                 </TableCell>
 
-                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '12%' }}>
+                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '14%' }}>
                   Description
                 </TableCell>
 
-                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '15%' }}>
+                <TableCell align="left" sx={{ fontWeight: 700, color: '#333', textTransform: 'uppercase', letterSpacing: 0.5, padding: '16px', width: '13%' }}>
                   Schedule Name
                 </TableCell>
 
