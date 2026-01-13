@@ -156,7 +156,6 @@ const MonitorListResults = (props) => {
     }
   };
 
-  // Render status cell with current info
   const renderStatusCell = (monitor) => {
     const status = monitorStatuses[monitor.MonitorRef];
     const isLoading = loadingStatus[monitor.MonitorRef];
@@ -198,7 +197,41 @@ const MonitorListResults = (props) => {
       );
     }
 
-    if (status.error) {
+    // ✅ NEW: Check for API-level error FIRST (returned by backend GetMonitorStatus)
+    if (status.error || (status.Error && status.Error.ErrorMessage)) {
+      const errorMsg = status.error || status.Error?.ErrorMessage || 'Unknown Error';
+      
+      // If error is "No Internet Connection" from backend, show specific message
+      if (errorMsg === 'No Internet Connection' || errorMsg.includes('Internet')) {
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Chip 
+              label="Backend Unreachable"
+              size="small"
+              sx={{ 
+                bgcolor: '#fff3e0',
+                color: '#e65100',
+                fontWeight: 600,
+                minWidth: '80px'
+              }}
+            />
+            <IconButton 
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRefreshStatus(monitor.MonitorRef);
+              }}
+              sx={{ padding: '4px' }}
+            >
+              <SvgIcon fontSize="small">
+                <RefreshIcon />
+              </SvgIcon>
+            </IconButton>
+          </Box>
+        );
+      }
+      
+      // Other API errors
       return (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Chip 
@@ -227,16 +260,52 @@ const MonitorListResults = (props) => {
       );
     }
 
-    // ✅ NEW: Check for specific error types FIRST
+    // ✅ Check for health monitor errors (from TV app heartbeat)
     const statusErrors = status.Errors || status.errors;
     
-    // Check for "connection_lost" or "No Internet Connection" errors ONLY
+    // ✅ Check for "reconnecting" state FIRST
+    const isReconnecting = statusErrors && statusErrors.some(e => 
+      e.type === 'reconnecting' || 
+      e.message?.includes('Reconnecting')
+    );
+
+    if (isReconnecting) {
+      return (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Chip 
+            label="Reconnecting..."
+            size="small"
+            sx={{ 
+              bgcolor: '#fff3e0',
+              color: '#e65100',
+              fontWeight: 600,
+              minWidth: '80px'
+            }}
+          />
+          <CircularProgress size={16} sx={{ ml: 1 }} />
+          <IconButton 
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRefreshStatus(monitor.MonitorRef);
+            }}
+            sx={{ padding: '4px' }}
+          >
+            <SvgIcon fontSize="small">
+              <RefreshIcon />
+            </SvgIcon>
+          </IconButton>
+        </Box>
+      );
+    }
+    
+    // ✅ Check for TV-reported network errors
     const hasNetworkError = statusErrors && statusErrors.some(e => 
       e.type === 'connection_lost' || 
+      e.type === 'network_error' ||  // ✅ ADDED
       e.message === 'No Internet Connection'
     );
 
-    // ✅ Show "No Internet" ONLY if connection_lost error exists
     if (hasNetworkError) {
       return (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
